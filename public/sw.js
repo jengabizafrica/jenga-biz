@@ -1,5 +1,6 @@
 const CACHE_NAME = 'jengabiz-v3';
 const CACHE_VERSION = 'v3';
+const CACHE_NAME = `jenga-cache-${CACHE_VERSION}`;
 const CORE_ASSETS = [
   '/',
   '/index.html',
@@ -25,16 +26,20 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(CORE_ASSETS))
       .then(() => self.skipWaiting())
+      .catch((err) => {
+        console.error('SW install error:', err);
+      })
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.map((key) => 
+      Promise.all(keys.map((key) =>
         key !== CACHE_NAME ? caches.delete(key) : Promise.resolve()
       ))
     ).then(() => self.clients.claim())
+    .catch((err) => console.error('SW activate error:', err))
   );
 });
 
@@ -46,30 +51,30 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  const request = event.request;
-  const url = new URL(request.url);
+  try {
+    const request = event.request;
+    const url = new URL(request.url);
 
-  // Skip non-GET requests and chrome-extension requests
-  if (request.method !== 'GET' || url.protocol === 'chrome-extension:') {
-    return;
-  }
+    if (request.method !== 'GET' || url.protocol === 'chrome-extension:') {
+      return;
+    }
 
-  // Skip API requests and external resources
-  const isApiRequest = API_ENDPOINTS.some(api => url.href.includes(api));
-  const isExternal = url.origin !== location.origin;
-  
-  // Only cache same-origin resources and specific file types
-  if (isApiRequest || isExternal) {
-    event.respondWith(networkOnly(request));
-    return;
-  }
+    const isApiRequest = API_ENDPOINTS.some(api => url.href.includes(api));
+    const isExternal = url.origin !== location.origin;
 
-  // For static assets and pages, use cache-first strategy
-  if (url.pathname.startsWith('/assets/') || CORE_ASSETS.includes(url.pathname)) {
-    event.respondWith(cacheFirst(request));
-  } else {
-    // For other same-origin requests, use network-first strategy
-    event.respondWith(networkFirst(request));
+    if (isApiRequest || isExternal) {
+      event.respondWith(networkOnly(request));
+      return;
+    }
+
+    if (url.pathname.startsWith('/assets/') || CORE_ASSETS.includes(url.pathname)) {
+      event.respondWith(cacheFirst(request));
+    } else {
+      event.respondWith(networkFirst(request));
+    }
+  } catch (err) {
+    // Fail safe: do not block network
+    console.error('SW fetch handler error:', err);
   }
 });
 

@@ -199,7 +199,7 @@ const UserDashboard = ({ }: UserDashboardProps) => {
       setProfile(data);
     } catch (error: any) {
       const msg = error?.message || JSON.stringify(error);
-      console.error('Error loading user profile:', msg);
+      console.error('Error loading user profile:', msg, error);
     } finally {
       setLoadingProfile(false);
     }
@@ -222,8 +222,9 @@ const UserDashboard = ({ }: UserDashboardProps) => {
       
       console.log('Loaded milestones:', data);
       setAllMilestones(data || []);
-    } catch (error) {
-      console.error('Error loading user milestones:', error);
+    } catch (error: any) {
+      const msg = error?.message || JSON.stringify(error);
+      console.error('Error loading user milestones:', msg, error);
     } finally {
       setLoadingMilestones(false);
     }
@@ -256,8 +257,9 @@ const UserDashboard = ({ }: UserDashboardProps) => {
         netProfit: totalRevenue - totalExpenses,
         recentTransactions
       });
-    } catch (error) {
-      console.error('Error loading financial data:', error);
+    } catch (error: any) {
+      const msg = error?.message || JSON.stringify(error);
+      console.error('Error loading financial data:', msg, error);
     } finally {
       setLoadingFinancial(false);
     }
@@ -609,6 +611,12 @@ const UserDashboard = ({ }: UserDashboardProps) => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Your Strategies</h2>
+            {profile?.account_type !== 'organization' && (
+              <Button onClick={handleNewStrategy}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Strategy
+              </Button>
+            )}
           </div>
 
           {loading ? (

@@ -52,21 +52,37 @@ export const useStrategy = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('strategies')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('updated_at', { ascending: false });
 
+      let { data, error } = await query;
+
+      // Fallback if column filter causes error (e.g., missing column)
+      if (error) {
+        const msg = (error as any)?.message?.toString() || '';
+        if (msg.includes('does not exist') || msg.includes('column') || msg.includes('operator does not exist')) {
+          const res = await supabase
+            .from('strategies')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false });
+          data = res.data as any[] | null;
+          error = res.error as any;
+        }
+      }
+
       if (error) throw error;
-      
       setStrategies(data || []);
-    } catch (error) {
-      console.error('Error loading strategies:', error);
+    } catch (error: any) {
+      const msg = error?.message || JSON.stringify(error);
+      console.error('Error loading strategies:', msg, error);
       toast({
-        title: 'Error',
-        description: 'Failed to load strategies',
+        title: 'Failed to load strategies',
+        description: msg,
         variant: 'destructive'
       });
     } finally {

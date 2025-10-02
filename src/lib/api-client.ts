@@ -97,8 +97,10 @@ class EdgeFunctionsApiClient {
 
   constructor() {
     const root = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-    console.log(root);
-    this.baseUrl = `${root}/functions/v1`;
+    // Prefer the dedicated functions domain to avoid proxy/CORS issues
+    // e.g., https://<project>.supabase.co -> https://<project>.functions.supabase.co
+    const functionsDomain = root.replace('https://', 'https://').replace('.supabase.co', '.functions.supabase.co');
+    this.baseUrl = functionsDomain;
   }
 
   /**
@@ -108,11 +110,15 @@ class EdgeFunctionsApiClient {
     const { data: { session } } = await supabase.auth.getSession();
     const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token || ''}`,
+      'Accept': 'application/json',
       'apikey': anonKey,
     };
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    return headers;
   }
 
   /**
@@ -124,13 +130,24 @@ class EdgeFunctionsApiClient {
   ): Promise<T> {
     const headers = await this.getAuthHeaders();
 
-    const res = await fetch(`${this.baseUrl}/${endpoint}`, {
-      ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/${endpoint}`, {
+        ...options,
+        mode: 'cors',
+        cache: 'no-store',
+        headers: {
+          ...headers,
+          ...(options.headers || {}),
+        },
+      });
+    } catch (err) {
+      throw new ApiError({
+        code: 'NETWORK_ERROR',
+        message: 'Failed to reach server',
+        details: { endpoint, error: err instanceof Error ? err.message : String(err) }
+      });
+    }
 
     // Read response as text first to preserve raw body for better errors
     const text = await res.text();
@@ -445,17 +462,29 @@ class EdgeFunctionsApiClient {
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
       const headers = {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
         'apikey': anonKey,
         'Authorization': `Bearer ${anonKey}`,
-      };
+      } as Record<string, string>;
 
-      const response = await fetch(`${this.baseUrl}/${endpoint}`, {
-        ...options,
-        headers: {
-          ...headers,
-          ...(options.headers || {}),
-        },
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}/${endpoint}`, {
+          ...options,
+          mode: 'cors',
+          cache: 'no-store',
+          headers: {
+            ...headers,
+            ...(options.headers || {}),
+          },
+        });
+      } catch (err) {
+        throw new ApiError({
+          code: 'NETWORK_ERROR',
+          message: 'Failed to reach server',
+          details: { endpoint, error: err instanceof Error ? err.message : String(err) }
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();

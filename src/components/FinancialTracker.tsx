@@ -64,18 +64,21 @@ const FinancialTracker = ({
     if (user) {
       loadTransactions();
     }
-  }, [user]);
+  }, [user, strategyId]);
 
   const loadTransactions = async () => {
     if (!user) return;
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('financial_transactions')
         .select('*')
-        .eq('user_id', user.id)
-        .order('transaction_date', { ascending: false });
+        .eq('user_id', user.id);
+      if (strategyId) {
+        query = query.eq('strategy_id', strategyId);
+      }
+      const { data, error } = await query.order('transaction_date', { ascending: false });
 
       if (error) throw error;
 
