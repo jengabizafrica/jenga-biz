@@ -125,6 +125,9 @@ const UserDashboard = ({ }: UserDashboardProps) => {
   const [reportMode, setReportMode] = useState<'download' | 'share'>('download');
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [fallbackStrategies, setFallbackStrategies] = useState<Strategy[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [strategyPendingDeletion, setStrategyPendingDeletion] = useState<Strategy | null>(null);
+  const [isDeletingStrategy, setIsDeletingStrategy] = useState(false);
 
   // Helpers to safely handle possibly-null/undefined date strings coming from the DB
   const safeParseDate = (dateStr?: string | null): Date | null => {
