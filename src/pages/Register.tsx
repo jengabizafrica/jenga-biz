@@ -32,13 +32,20 @@ export default function RegisterPage() {
       // validate
       (async () => {
         try {
-          const res = await apiClient.validateInviteCode(code);
-          setInviteValidated(!!res?.valid);
-          if (res?.invite?.invited_email) setEmail(res.invite.invited_email);
-          if (res?.invite?.account_type) setAccountType(res.invite.account_type as any);
-        } catch (e) {
-          setInviteValidated(false);
-        }
+            const res = await apiClient.validateInviteCode(code);
+            setInviteValidated(!!res?.valid);
+            if (res?.invite?.invited_email) setEmail(res.invite.invited_email);
+            if (res?.invite?.account_type) setAccountType(res.invite.account_type as any);
+            if (!res?.valid) {
+              // helpful debug info for environments where validation seems inconsistent
+              // avoid logging any tokens or headers; only log the validated payload
+              console.debug('[invite-validate] validation returned false payload:', res);
+            }
+          } catch (e: any) {
+            setInviteValidated(false);
+            // log the error details to help debugging (do not expose secrets)
+            console.error('[invite-validate] error while validating invite code:', { message: e?.message || e, raw: e?.error?.raw || e?.error || null });
+          }
       })();
     }
     if (em) setEmail(em);
@@ -86,7 +93,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create your account</CardTitle>
-          <CardDescription>Register using an invite code or use the manual entry flow.</CardDescription>
+          <CardDescription>Register using an invite code.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

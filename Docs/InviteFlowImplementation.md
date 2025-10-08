@@ -20,7 +20,8 @@ Server-side
     - POST /invite-codes  (create)
     - GET /invite-codes/validate?code=...  (public validate)
     - POST /invite-codes/consume  (consume & link user)
-  - `supabase/functions/send-signup-confirmation/index.ts` sends signup confirmation emails (uses RESEND_API_KEY env)
+  - `supabase/functions/send-signup-confirmation/index.ts` sends self-registration confirmation emails (uses BREVO_API_KEY env)
+  - `supabase/functions/send-invite-confirmation/index.ts` sends invite emails (uses BREVO_API_KEY env)
 
 Client-side changes
 - New `src/pages/Register.tsx` handles the direct link flow.
@@ -28,10 +29,10 @@ Client-side changes
 - `src/components/auth/InviteCodeManager.tsx` now attempts to email the generated invite link (best-effort). It uses `window.__FUNCTIONS_BASE__` or `REACT_APP_FUNCTIONS_BASE` to locate the functions host; fallback is `/.netlify/functions`.
 
 Env & deployment
-- For email sending from the client, set `window.__FUNCTIONS_BASE__` at runtime or `REACT_APP_FUNCTIONS_BASE` at build time to the platform's functions host that exposes `send-signup-confirmation`. Example values:
+- For email sending from the client, set `window.__FUNCTIONS_BASE__` at runtime or `REACT_APP_FUNCTIONS_BASE` at build time to the platform's functions host that exposes the functions (e.g. `send-signup-confirmation` and `send-invite-confirmation`). Example values:
   - `https://<project>.functions.supabase.co` (for Supabase Functions)
   - `https://<site>/.netlify/functions` (for Netlify deploy)
-- Ensure Edge Functions have `RESEND_API_KEY` set in their environment for email sending.
+- Ensure Edge Functions have `BREVO_API_KEY` (and optionally `BREVO_SENDER_EMAIL`) set in their environment for email sending.
 
 Testing
 1. Create an invite using Admin dashboard -> Invite Codes.

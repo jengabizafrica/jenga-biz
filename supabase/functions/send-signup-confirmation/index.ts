@@ -49,9 +49,10 @@ const handler = async (req: Request): Promise<Response> => {
     const text = body.text || `Please confirm your email by visiting: ${confirmationUrl}`;
     const html = body.html || `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background-color: #f97316; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 24px;">Welcome to Jenga Biz Africa!</h1>
-          </div>
+          <div style="background-color: #f97316; padding: 8px 20px 14px 20px; text-align: center; border-radius: 8px 8px 0 0;">
+              <img src="https://diclwatocrixibjpajuf.supabase.co/storage/v1/object/sign/Assets/jenga-biz-logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8yODEzZWU5Zi1mMWQ4LTQ5YzMtODQ4Yi0yMWY1ZmViMGFmN2MiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJBc3NldHMvamVuZ2EtYml6LWxvZ28ucG5nIiwiaWF0IjoxNzU5OTQ1NzYwLCJleHAiOjIzNTkxMjk3NjB9.c6AY3QkcFeRAeWi64wSF0Mak7pGg9Sa2bwjiZdguLa4" alt="Jenga Biz" style="height:44px;display:inline-block;margin-bottom:6px;" />
+              <h1 style="color: white; margin: 0; font-size: 18px;">Welcome to Jenga Biz Africa!</h1>
+            </div>
           
           <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
             <h2 style="color: #374151; margin-bottom: 20px;">Confirm Your Email Address</h2>
@@ -93,82 +94,70 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
     // BREVO-only mode: require BREVO_API_KEY in function env
-    const brevoKey = Deno.env.get('BREVO_API_KEY') || Deno.env.get('VITE_BREVO_API_KEY');
+    // Add defensive logging and a dev-only header override to help diagnose intermittent missing-secret errors.
+    function maskKey(k?: string | undefined) {
+      if (!k) return null;
+      try { return `${k.slice(0,4)}...(${k.length})`; } catch { return '***'; }
+    }
+
+    const brevoEnv = Deno.env.get('BREVO_API_KEY');
+    const brevoVite = Deno.env.get('VITE_BREVO_API_KEY');
+    let brevoKey = brevoEnv || brevoVite;
+
+    // In development ONLY, allow an override from a request header to help debug deployed functions locally.
+    if (!brevoKey && isDev) {
+      const hdr = req.headers.get('x-brevo-api-key') || req.headers.get('x-debug-brevo-key') || undefined;
+      if (hdr) {
+        console.warn('send-signup-confirmation: using BREVO API key from request header (development only)');
+        brevoKey = hdr;
+      }
+    }
+
+    console.debug('send-signup-confirmation: brevoKey present=', !!brevoKey, 'sources=', { BREVO_API_KEY: !!brevoEnv, VITE_BREVO_API_KEY: !!brevoVite }, 'masked=', maskKey(brevoKey));
+
+    // Quick retry: attempt to re-read env once after a short delay in case of transient env propagation
+    if (!brevoKey) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        brevoKey = Deno.env.get('BREVO_API_KEY') || Deno.env.get('VITE_BREVO_API_KEY');
+        console.debug('send-signup-confirmation: retry read brevoKey present=', !!brevoKey, 'masked=', maskKey(brevoKey));
+      } catch (e) {
+        // ignore
+      }
+    }
+
     if (!brevoKey) {
       console.error('BREVO_API_KEY is not configured for send-signup-confirmation');
       return new Response(JSON.stringify({ success: false, error: 'brevo_not_configured', message: 'BREVO_API_KEY must be set in the function environment' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
-    // Server-side template rendering: prefer body.html; otherwise choose based on inviteCode presence
+    // This function is strictly for self-registration confirmation emails.
+    // Invite-specific emails are handled by `send-invite-confirmation`.
     const inviteCode = (body as any).inviteCode as string | undefined;
-    let renderedHtml = html;
-    let renderedText = text;
-
-    if (!body.html) {
-      if (inviteCode) {
-        // Invite template
-        renderedHtml = `<!doctype html>
-<html>
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
-  <body style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;background:#f3f4f6;padding:20px;margin:0;">
-    <table role="presentation" style="width:100%;max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e6e7ea;">
-      <tr style="background:#111827"><td style="padding:14px;text-align:center;"><img src="https://diclwatocrixibjpajuf.supabase.co/storage/v1/object/public/public/jenga-biz-logo.png" alt="Jenga Biz" style="height:44px" /></td></tr>
-      <tr><td style="padding:24px;">
-        <h2 style="margin:0 0 12px 0;color:#111827;font-size:20px;">You have been invited</h2>
-        <p style="color:#6b7280;margin:0 0 18px 0;line-height:1.6;">You were invited to create an account on Jenga Biz Africa.</p>
-        <div style="background:#f9fafb;border:1px dashed #e6e7ea;padding:12px;border-radius:8px;margin-bottom:18px;">
-          <strong style="display:block;color:#111827;margin-bottom:6px;">Invite code</strong>
-          <div style="font-family:monospace;font-size:16px;color:#111827;">${inviteCode}</div>
-          <p style="color:#6b7280;font-size:13px;margin:8px 0 0 0;">Open the app and enter this code during registration.</p>
-        </div>
-        <div style="text-align:center;margin:16px 0;"><a href="${confirmationUrl}" style="display:inline-block;background:#047857;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Accept the invite and register</a></div>
-        <p style="color:#6b7280;font-size:13px;">If the button doesn't work, use this link:</p>
-        <p style="background:#f9fafb;padding:12px;border-radius:6px;font-family:monospace;font-size:13px;word-break:break-all;color:#111827;">${confirmationUrl}</p>
-        <hr style="border:none;border-top:1px solid #eef2f6;margin:20px 0;" />
-        <p style="color:#9ca3af;font-size:12px;margin:0;">If you weren't expecting this invite, ignore this message or contact your hub administrator.</p>
-      </td></tr>
-    </table>
-  </body>
-</html>`;
-
-        renderedText = `You have been invited
-
-Invite code: ${inviteCode}
-
-Accept the invite: ${confirmationUrl}
-`;
-      } else {
-        // Confirmation template
-        renderedHtml = `<!doctype html>
-<html>
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
-  <body style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial; background:#f3f4f6; padding:20px; margin:0;">
-    <table role="presentation" style="width:100%;max-width:600px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e6e7ea;">
-      <tr style="background:#111827;"><td style="padding:18px;text-align:center;"><img src="https://diclwatocrixibjpajuf.supabase.co/storage/v1/object/public/public/jenga-biz-logo.png" alt="Jenga Biz" style="height:44px;display:inline-block" /></td></tr>
-      <tr><td style="padding:28px;"><h2 style="margin:0 0 12px 0;color:#111827;font-size:20px;">Confirm your signup</h2>
-          <p style="color:#6b7280;margin:0 0 20px 0;line-height:1.6;">Thank you for joining Jenga Biz Africa. Click the button below to confirm your email and activate your account.</p>
-          <div style="text-align:center;margin:22px 0;"><a href="${confirmationUrl}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;">Confirm your email</a></div>
-          <p style="color:#6b7280;font-size:13px;">If the button doesn't work, copy and paste this link into your browser:</p>
-          <p style="background:#f9fafb;padding:12px;border-radius:6px;font-family:monospace;font-size:13px;word-break:break-all;color:#111827;">${confirmationUrl}</p>
-          <hr style="border:none;border-top:1px solid #eef2f6;margin:20px 0;" />
-          <p style="color:#9ca3af;font-size:12px;margin:0;">If you didn't request this, you can ignore this email.</p>
-      </td></tr>
-    </table>
-  </body>
-</html>`;
-
-        renderedText = `Confirm your signup
-
-Follow this link to confirm your user:
-${confirmationUrl}
-`;
-      }
+    if (inviteCode) {
+      console.warn('send-signup-confirmation invoked with inviteCode; invite sends should use send-invite-confirmation. Ignoring inviteCode and sending confirmation template.');
     }
+    const renderedHtml = html;
+    const renderedText = text;
+
+    // Determine sender email (env override preferred). In production this must be a verified sender in Brevo.
+    const envSender = Deno.env.get('BREVO_SENDER_EMAIL');
+    const defaultSender = 'jengabizafrica@gmail.com';
+    let senderEmail = envSender || defaultSender;
+
+    // Allow a dev-only override via request header or body for testing
+    if (isDev) {
+      const hdrSender = req.headers.get('x-sender-email') || undefined;
+      if (hdrSender) senderEmail = hdrSender;
+      if ((body as any).senderEmail) senderEmail = (body as any).senderEmail;
+    }
+
+    console.debug('send-signup-confirmation: using sender=', senderEmail);
 
     // Send via Brevo
     try {
       const brevoPayload = {
-        sender: { name: 'Jenga Biz Africa', email: 'support@jengabiz.africa' },
+        sender: { name: 'Jenga Biz Africa', email: senderEmail },
         to: [{ email }],
         subject,
         htmlContent: renderedHtml,

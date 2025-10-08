@@ -209,61 +209,19 @@ export function InviteCodeManager({ hubId }: { hubId?: string | null } = {}) {
       // server wraps created resource in { success: true, data: { ... } }
       const code = created?.data?.code || created?.code || Math.random().toString(36).substring(2, 15);
 
-      // Send email with link to register (one-click link) - best-effort
-      try {
-        const appUrl = window.location.origin;
-        const registerUrl = `${appUrl}/register?invite_code=${encodeURIComponent(code)}&email=${encodeURIComponent(newInvite.email)}`;
+      // The server-side createInviteCode already triggers a non-blocking invite email send.
+      // Avoid sending from the client to prevent duplicate emails.
+      const appUrl = window.location.origin;
+      const registerUrl = `${appUrl}/register?invite_code=${encodeURIComponent(code)}&email=${encodeURIComponent(newInvite.email)}`;
 
-        // Determine functions base: prefer injected env variables; fall back to Vite env or Netlify-style functions
-        const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
-        const getFunctionsBase = () => {
-          // Prefer explicit runtime override (injected by hosting) or a Vite env
-          const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
-          if (injected) return injected;
-          if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
+      // show the registration link modal so admin can copy/send it immediately
+      setLastRegistrationLink(registerUrl);
+      setShowRegistrationLinkModal(true);
 
-          // Prefer project ref/id envs (Vercel/Netlify style)
-          const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
-          if (ref) return `https://${ref}.functions.supabase.co`;
-
-          // Fall back to the Supabase URL env and use the functions/v1 path
-          const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || SUPABASE_URL || '';
-          if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
-
-          // Last resort: current origin (development only)
-          return window.location.origin;
-        };
-        const functionsBase = getFunctionsBase();
-
-        // Improved email payload: include subject, plain text and html body
-        const payload = {
-          email: newInvite.email,
-          confirmationUrl: registerUrl,
-          subject: 'You were invited to join Jenga',
-          text: `You have been invited to join Jenga. Click or paste this link to register: ${registerUrl}`,
-          html: `<p>You have been invited to join <strong>Jenga</strong>.</p><p>Click the link below to complete registration:</p><p><a href="${registerUrl}">${registerUrl}</a></p><p>If you prefer, copy this invite code: <code>${code}</code></p>`
-        };
-
-        await fetch(`${functionsBase}/send-signup-confirmation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } catch (e) {
-        // best-effort; don't block
-        console.error('Failed to send invite email:', e);
-      }
-        const appUrl = window.location.origin;
-        const registerUrl = `${appUrl}/register?invite_code=${encodeURIComponent(code)}&email=${encodeURIComponent(newInvite.email)}`;
-
-        // show the registration link modal so admin can copy/send it immediately
-        setLastRegistrationLink(registerUrl);
-        setShowRegistrationLinkModal(true);
-
-        toast({
-          title: 'Invite code created!',
-          description: `Invite code for ${newInvite.email} has been generated.`,
-        });
+      toast({
+        title: 'Invite code created!',
+        description: `Invite code for ${newInvite.email} has been generated.`,
+      });
 
       // Reset form and refresh list
       setNewInvite({ email: '', accountType: 'business' });
@@ -344,8 +302,7 @@ export function InviteCodeManager({ hubId }: { hubId?: string | null } = {}) {
 
   const sendInviteEmail = async (invite: InviteCode) => {
     try {
-      const appUrl = window.location.origin;
-      const registerUrl = `${appUrl}/register?invite_code=${encodeURIComponent(invite.code)}&email=${encodeURIComponent(invite.invited_email)}`;
+      // Call server-side send endpoint to centralize email sending and avoid duplicates
       const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
       const getFunctionsBase = () => {
         const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
@@ -353,27 +310,28 @@ export function InviteCodeManager({ hubId }: { hubId?: string | null } = {}) {
         if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
         const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
         if (ref) return `https://${ref}.functions.supabase.co`;
-        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || '';
+        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || SUPABASE_URL || '';
         if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
         return window.location.origin;
       };
       const functionsBase = getFunctionsBase();
 
-      const payload = {
-        email: invite.invited_email,
-        confirmationUrl: registerUrl,
-        subject: 'You were invited to join Jenga',
-        text: `You have been invited to join Jenga. Register here: ${registerUrl}`,
-        html: `<p>You have been invited to join <strong>Jenga</strong>.</p><p>Click the link below to complete registration:</p><p><a href="${registerUrl}">${registerUrl}</a></p><p>Invite code: <code>${invite.code}</code></p>`
-      };
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
-      const resp = await fetch(`${functionsBase}/send-signup-confirmation`, {
+      const resp = await fetch(`${functionsBase}/invite-codes/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({ code: invite.code })
       });
 
-      if (!resp.ok) throw new Error('Email send failed');
+      if (!resp.ok) {
+        const b = await resp.text().catch(() => '');
+        throw new Error(b || 'Server send failed');
+      }
 
       toast({ title: 'Email sent', description: `Invite sent to ${invite.invited_email}` });
     } catch (e) {
