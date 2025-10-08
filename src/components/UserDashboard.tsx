@@ -156,11 +156,18 @@ const UserDashboard = ({ }: UserDashboardProps) => {
   const handleEditProfile = () => navigate('/profile');
 
   // Delete strategy handler
-  const handleDeleteStrategy = async (id: string) => {
-    const confirmed = window.confirm("Are you sure you want to delete this strategy?");
-    if (!confirmed) return;
+  const handleDeleteStrategy = (strategy: Strategy) => {
+    setStrategyPendingDeletion(strategy);
+    setIsDeleteDialogOpen(true);
+  };
 
+  const confirmDeleteStrategy = async () => {
+    if (!strategyPendingDeletion) return;
+
+    const id = strategyPendingDeletion.id;
     console.log('🔍 Delete strategy - ID:', id, 'User:', user?.id);
+
+    setIsDeletingStrategy(true);
 
     try {
       // First verify the strategy exists and belongs to the user
@@ -203,8 +210,9 @@ const UserDashboard = ({ }: UserDashboardProps) => {
           title: "Success",
           description: "Strategy deleted successfully.",
         });
-        // Refresh strategies after delete
         loadStrategies();
+        setIsDeleteDialogOpen(false);
+        setStrategyPendingDeletion(null);
       }
     } catch (error) {
       console.error("Unexpected error during delete:", error);
@@ -213,6 +221,8 @@ const UserDashboard = ({ }: UserDashboardProps) => {
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsDeletingStrategy(false);
     }
   };
 
