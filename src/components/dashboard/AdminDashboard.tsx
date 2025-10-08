@@ -340,7 +340,7 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
 
         {/* Main Dashboard Content */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList>
+          <TabsList className="max-[991px]:flex max-[991px]:flex-row max-[991px]:flex-wrap">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               User Management
