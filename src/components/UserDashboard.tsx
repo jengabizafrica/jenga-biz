@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -124,6 +125,9 @@ const UserDashboard = ({ }: UserDashboardProps) => {
   const [reportMode, setReportMode] = useState<'download' | 'share'>('download');
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
   const [fallbackStrategies, setFallbackStrategies] = useState<Strategy[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [strategyPendingDeletion, setStrategyPendingDeletion] = useState<Strategy | null>(null);
+  const [isDeletingStrategy, setIsDeletingStrategy] = useState(false);
 
   // Helpers to safely handle possibly-null/undefined date strings coming from the DB
   const safeParseDate = (dateStr?: string | null): Date | null => {
@@ -152,11 +156,18 @@ const UserDashboard = ({ }: UserDashboardProps) => {
   const handleEditProfile = () => navigate('/profile');
 
   // Delete strategy handler
-  const handleDeleteStrategy = async (id: string) => {
-    const confirmed = window.confirm("Are you sure you want to delete this strategy?");
-    if (!confirmed) return;
+  const handleDeleteStrategy = (strategy: Strategy) => {
+    setStrategyPendingDeletion(strategy);
+    setIsDeleteDialogOpen(true);
+  };
 
+  const confirmDeleteStrategy = async () => {
+    if (!strategyPendingDeletion) return;
+
+    const id = strategyPendingDeletion.id;
     console.log('🔍 Delete strategy - ID:', id, 'User:', user?.id);
+
+    setIsDeletingStrategy(true);
 
     try {
       // First verify the strategy exists and belongs to the user
@@ -199,8 +210,9 @@ const UserDashboard = ({ }: UserDashboardProps) => {
           title: "Success",
           description: "Strategy deleted successfully.",
         });
-        // Refresh strategies after delete
         loadStrategies();
+        setIsDeleteDialogOpen(false);
+        setStrategyPendingDeletion(null);
       }
     } catch (error) {
       console.error("Unexpected error during delete:", error);
@@ -209,6 +221,8 @@ const UserDashboard = ({ }: UserDashboardProps) => {
         description: "An unexpected error occurred. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsDeletingStrategy(false);
     }
   };
 
@@ -916,7 +930,7 @@ const UserDashboard = ({ }: UserDashboardProps) => {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => handleDeleteStrategy(strategy.id)}
+                          onClick={() => handleDeleteStrategy(strategy)}
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
                           Delete
@@ -977,7 +991,7 @@ const UserDashboard = ({ }: UserDashboardProps) => {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() => handleDeleteStrategy(strategy.id)}
+                              onClick={() => handleDeleteStrategy(strategy)}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Delete
@@ -996,6 +1010,40 @@ const UserDashboard = ({ }: UserDashboardProps) => {
 
 
       </div>
+
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isDeletingStrategy) {
+            return;
+          }
+          setIsDeleteDialogOpen(open);
+          if (!open) {
+            setStrategyPendingDeletion(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Strategy</AlertDialogTitle>
+            <AlertDialogDescription>
+              {strategyPendingDeletion?.business_name
+                ? `Are you sure you want to delete "${strategyPendingDeletion.business_name}"? This action cannot be undone.`
+                : 'Are you sure you want to delete this strategy? This action cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingStrategy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteStrategy}
+              disabled={isDeletingStrategy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive"
+            >
+              {isDeletingStrategy ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Report Modal */}
       <ReportModal
