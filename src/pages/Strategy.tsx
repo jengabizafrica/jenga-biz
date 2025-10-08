@@ -61,14 +61,19 @@ const Strategy = () => {
     navigate('/');
   };
 
+  const handleStrategyDeleted = useCallback(() => {
+    navigate('/dashboard', { replace: true });
+  }, [navigate]);
+
   return (
-    <CombinedStrategyFlow 
+    <CombinedStrategyFlow
       template={template}
       onBack={handleBack}
       onHome={handleHome}
       initialLanguage={language}
       currentStrategy={strategies.find(s => s.id === strategyId)}
       defaultTab={defaultTab}
+      onStrategyDeleted={handleStrategyDeleted}
     />
   );
 };
