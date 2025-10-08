@@ -1011,6 +1011,40 @@ const UserDashboard = ({ }: UserDashboardProps) => {
 
       </div>
 
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && isDeletingStrategy) {
+            return;
+          }
+          setIsDeleteDialogOpen(open);
+          if (!open) {
+            setStrategyPendingDeletion(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Strategy</AlertDialogTitle>
+            <AlertDialogDescription>
+              {strategyPendingDeletion?.business_name
+                ? `Are you sure you want to delete "${strategyPendingDeletion.business_name}"? This action cannot be undone.`
+                : 'Are you sure you want to delete this strategy? This action cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingStrategy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteStrategy}
+              disabled={isDeletingStrategy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive"
+            >
+              {isDeletingStrategy ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Report Modal */}
       <ReportModal
         open={reportModalOpen}
