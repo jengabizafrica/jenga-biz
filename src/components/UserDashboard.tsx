@@ -930,7 +930,7 @@ const UserDashboard = ({ }: UserDashboardProps) => {
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => handleDeleteStrategy(strategy.id)}
+                          onClick={() => handleDeleteStrategy(strategy)}
                         >
                           <Trash2 className="w-3 h-3 mr-1" />
                           Delete
@@ -991,7 +991,7 @@ const UserDashboard = ({ }: UserDashboardProps) => {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
-                              onClick={() => handleDeleteStrategy(strategy.id)}
+                              onClick={() => handleDeleteStrategy(strategy)}
                             >
                               <Trash2 className="w-4 h-4 mr-2" />
                               Delete
