@@ -2,8 +2,8 @@ project_id = "diclwatocrixibjpajuf"
 
 [auth]
 enabled = true
-site_url = "https://jengabiz.africa"
-additional_redirect_urls = ["https://jengabiz.africa/auth", "https://jengabiz.africa/reset-password"]
+site_url = "https://jenga-biz.vercel.app"
+additional_redirect_urls = ["https://jenga-biz.vercel.app/auth", "https://jenga-biz.vercel.app/reset-password"]
 
 [auth.email]
 enable_confirmations = true
