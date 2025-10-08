@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import CombinedStrategyFlow from '@/components/CombinedStrategyFlow';
 import { useStrategy } from '@/hooks/useStrategy';
@@ -61,14 +61,19 @@ const Strategy = () => {
     navigate('/');
   };
 
+  const handleStrategyDeleted = useCallback(() => {
+    navigate('/dashboard', { replace: true });
+  }, [navigate]);
+
   return (
-    <CombinedStrategyFlow 
+    <CombinedStrategyFlow
       template={template}
       onBack={handleBack}
       onHome={handleHome}
       initialLanguage={language}
       currentStrategy={strategies.find(s => s.id === strategyId)}
       defaultTab={defaultTab}
+      onStrategyDeleted={handleStrategyDeleted}
     />
   );
 };

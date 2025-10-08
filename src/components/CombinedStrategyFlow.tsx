@@ -22,6 +22,7 @@ interface CombinedStrategyFlowProps {
   initialLanguage?: string;
   currentStrategy?: any;
   defaultTab?: string | null;
+  onStrategyDeleted?: () => void;
 }
 
 const CombinedStrategyFlow = ({
@@ -30,7 +31,8 @@ const CombinedStrategyFlow = ({
   onHome,
   initialLanguage = 'en',
   currentStrategy: propCurrentStrategy,
-  defaultTab
+  defaultTab,
+  onStrategyDeleted
 }: CombinedStrategyFlowProps) => {
   const { toast } = useToast();
   const { signOut, user } = useAuth();
@@ -431,10 +433,14 @@ const CombinedStrategyFlow = ({
         await deleteStrategy(currentStrategy.id);
       }
       toast({ title: 'Strategy deleted', description: 'The strategy has been successfully deleted.' });
-      try {
-        navigate('/dashboard');
-      } catch (err) {
-        window.location.href = '/dashboard';
+      if (onStrategyDeleted) {
+        onStrategyDeleted();
+      } else {
+        try {
+          navigate('/dashboard', { replace: true });
+        } catch (err) {
+          window.location.href = '/dashboard';
+        }
       }
     } catch (error) {
       console.error('Failed to delete strategy:', error);
