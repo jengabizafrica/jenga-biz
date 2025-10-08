@@ -11,13 +11,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { useUserManagement, useRoleManagement, useDeleteUserHard } from "@/hooks/useEdgeUserManagement";
 import { Users, UserPlus, Edit, Trash2, Search, Shield } from "lucide-react";
+import { supabase } from '@/integrations/supabase/client';
 import type { User } from "@/lib/api-client";
+import { startImpersonation } from '@/lib/tenant';
 
 interface UserWithRoles extends User {
   roles: string[];
 }
 
-export function UserManagement({ hideSuperAdmins = false }: { hideSuperAdmins?: boolean }) {
+export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAdmins?: boolean; hubId?: string | null }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
@@ -46,7 +48,8 @@ export function UserManagement({ hideSuperAdmins = false }: { hideSuperAdmins?: 
   } = useUserManagement({ 
     search: searchQuery || undefined, 
     role: filterRole === "all" ? undefined : filterRole,
-    hideSuperAdmins 
+    hideSuperAdmins,
+    hubId: hubId || undefined,
   });
   
   const { getRoleColor } = useRoleManagement();
@@ -424,6 +427,44 @@ export function UserManagement({ hideSuperAdmins = false }: { hideSuperAdmins?: 
                                         </Button>
                                       )
                                     ))}
+                                </div>
+                              </div>
+                              {/* Start Impersonation (super-admin only) */}
+                              {/** Only show if current user is super-admin; handled by hideSuperAdmins prop elsewhere */}
+                              <div>
+                                <Label>Impersonation</Label>
+                                <div className="mt-2">
+                                  { (user.roles.includes('admin') || user.roles.includes('hub_manager')) && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={async () => {
+                                        try {
+                                          // Fetch hub_id for the target user from Supabase
+                                          const { data: rolesData, error: rolesErr } = await supabase.from('user_roles').select('hub_id').eq('user_id', user.id).limit(1).maybeSingle();
+                                          if (rolesErr) throw rolesErr;
+                                          const hubId = rolesData?.hub_id;
+                                          if (!hubId) {
+                                            toast({ title: 'No hub', description: 'Target user is not associated with a hub', variant: 'destructive' });
+                                            return;
+                                          }
+                                          const res = await startImpersonation(hubId);
+                                          if (res.success) {
+                                            toast({ title: 'Impersonation started', description: 'You are now impersonating the target hub' });
+                                            // reload page to pick up impersonation (HubContext polls status)
+                                            window.location.reload();
+                                          } else {
+                                            toast({ title: 'Impersonation failed', description: res.error || 'Could not start impersonation', variant: 'destructive' });
+                                          }
+                                        } catch (e) {
+                                          console.error('Start impersonation failed', e);
+                                          toast({ title: 'Impersonation error', description: 'Failed to start impersonation', variant: 'destructive' });
+                                        }
+                                      }}
+                                    >
+                                      Start Impersonation
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </div>

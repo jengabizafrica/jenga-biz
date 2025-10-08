@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
 import { Copy, Mail, Clock, CheckCircle, XCircle, Building2, Users } from 'lucide-react';
 
 // Type definitions
@@ -43,12 +43,14 @@ interface InviteCode {
   created_at: string;
 }
 
-export function InviteCodeManager() {
+export function InviteCodeManager({ hubId }: { hubId?: string | null } = {}) {
   const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showRegistrationLinkModal, setShowRegistrationLinkModal] = useState(false);
   const [lastRegistrationLink, setLastRegistrationLink] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [inviteToDelete, setInviteToDelete] = useState<InviteCode | null>(null);
   const [newInvite, setNewInvite] = useState({
     email: '',
     accountType: 'business' as 'business' | 'organization'
@@ -108,13 +110,39 @@ export function InviteCodeManager() {
   const fetchInviteCodes = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('invite_codes')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
+      const getFunctionsBase = () => {
+        const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
+        if (injected) return injected;
+        if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
+        const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
+        if (ref) return `https://${ref}.functions.supabase.co`;
+        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || SUPABASE_URL || '';
+        if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
+        return window.location.origin;
+      };
+      const functionsBase = getFunctionsBase();
 
-      if (error) throw error;
-      setInviteCodes((data || []) as InviteCode[]);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      // include hub filter when provided
+      const query = hubId ? `?hub_id=${encodeURIComponent(hubId)}` : '';
+      const resp = await fetch(`${functionsBase}/invite-codes${query}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        }
+      });
+
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body?.error?.message || body?.message || 'Failed to fetch invite codes');
+      }
+
+      const payload = await resp.json();
+      // Edge Functions use a response envelope: { success: true, data: ... }
+      // adapt to that shape and fall back to older shape if present
+      setInviteCodes((payload?.data?.invites || payload?.invites || []) as InviteCode[]);
     } catch (error) {
       console.error('Error fetching invite codes:', error);
       toast({
@@ -139,22 +167,47 @@ export function InviteCodeManager() {
 
     setCreating(true);
     try {
-      const code = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      // get current user id for created_by
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from('invite_codes')
-        .insert([
-          {
-            code,
-            invited_email: newInvite.email,
-            account_type: newInvite.accountType,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-            created_by: user?.id || ''
-          },
-        ]);
+      // Create invite via Edge Function so server enforces RBAC and hub scoping
+      const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
+      const getFunctionsBase = () => {
+        const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
+        if (injected) return injected;
+        if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
+        const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
+        if (ref) return `https://${ref}.functions.supabase.co`;
+        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || SUPABASE_URL || '';
+        if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
+        return window.location.origin;
+      };
+      const functionsBase = getFunctionsBase();
 
-      if (error) throw error;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const payload = {
+        invited_email: newInvite.email,
+        account_type: newInvite.accountType,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+        hub_id: hubId || null,
+      };
+
+      const res = await fetch(`${functionsBase}/invite-codes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error?.message || body?.message || 'Failed to create invite');
+      }
+
+      const created = await res.json();
+      // server wraps created resource in { success: true, data: { ... } }
+      const code = created?.data?.code || created?.code || Math.random().toString(36).substring(2, 15);
 
       // Send email with link to register (one-click link) - best-effort
       try {
@@ -163,9 +216,24 @@ export function InviteCodeManager() {
 
         // Determine functions base: prefer injected env variables; fall back to Vite env or Netlify-style functions
         const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
-        const functionsBase = (window as any).__SUPABASE_FUNCTIONS_URL__
-          || metaEnv.VITE_SUPABASE_FUNCTIONS_URL
-          || (metaEnv.VITE_SUPABASE_PROJECT_REF ? `https://${metaEnv.VITE_SUPABASE_PROJECT_REF}.functions.supabase.co` : window.location.origin);
+        const getFunctionsBase = () => {
+          // Prefer explicit runtime override (injected by hosting) or a Vite env
+          const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
+          if (injected) return injected;
+          if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
+
+          // Prefer project ref/id envs (Vercel/Netlify style)
+          const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
+          if (ref) return `https://${ref}.functions.supabase.co`;
+
+          // Fall back to the Supabase URL env and use the functions/v1 path
+          const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || SUPABASE_URL || '';
+          if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
+
+          // Last resort: current origin (development only)
+          return window.location.origin;
+        };
+        const functionsBase = getFunctionsBase();
 
         // Improved email payload: include subject, plain text and html body
         const payload = {
@@ -212,6 +280,56 @@ export function InviteCodeManager() {
     }
   };
 
+  const handleDeleteInvite = async (inviteId: string) => {
+    const target = inviteCodes.find(i => i.id === inviteId) || null;
+    setInviteToDelete(target);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteInvite = async () => {
+    if (!inviteToDelete) return;
+    try {
+      const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
+      const getFunctionsBase = () => {
+        const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
+        if (injected) return injected;
+        if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
+        const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
+        if (ref) return `https://${ref}.functions.supabase.co`;
+        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || '';
+        if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
+        return window.location.origin;
+      };
+      const functionsBase = getFunctionsBase();
+
+      // Get the current session access token to forward
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const resp = await fetch(`${functionsBase}/invite-codes?id=${encodeURIComponent(inviteToDelete.id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        }
+      });
+
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body?.error?.message || body?.message || 'Delete failed');
+      }
+
+      toast({ title: 'Invite deleted', description: 'The invite code was removed.' });
+      setShowDeleteModal(false);
+      setInviteToDelete(null);
+      await fetchInviteCodes();
+    } catch (err) {
+      console.error('Failed to delete invite:', err);
+      toast({ title: 'Delete failed', description: 'Unable to delete invite code', variant: 'destructive' });
+      setShowDeleteModal(false);
+      setInviteToDelete(null);
+    }
+  };
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -229,9 +347,17 @@ export function InviteCodeManager() {
       const appUrl = window.location.origin;
       const registerUrl = `${appUrl}/register?invite_code=${encodeURIComponent(invite.code)}&email=${encodeURIComponent(invite.invited_email)}`;
       const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
-      const functionsBase = (window as any).__SUPABASE_FUNCTIONS_URL__
-        || metaEnv.VITE_SUPABASE_FUNCTIONS_URL
-        || (metaEnv.VITE_SUPABASE_PROJECT_REF ? `https://${metaEnv.VITE_SUPABASE_PROJECT_REF}.functions.supabase.co` : window.location.origin);
+      const getFunctionsBase = () => {
+        const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
+        if (injected) return injected;
+        if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
+        const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
+        if (ref) return `https://${ref}.functions.supabase.co`;
+        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || '';
+        if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
+        return window.location.origin;
+      };
+      const functionsBase = getFunctionsBase();
 
       const payload = {
         email: invite.invited_email,
@@ -357,15 +483,26 @@ export function InviteCodeManager() {
                   <Building2 className="h-4 w-4 text-muted-foreground" />
                   <Label htmlFor="invite-business">Business Account</Label>
                 </div>
-                {userProfile?.roles?.some(role => 
-                  ['admin', 'super_admin'].includes(role.role)
-                ) && (
-                  <div className="flex items-center space-x-2 p-2 rounded border hover:bg-accent/50">
-                    <RadioGroupItem value="organization" id="invite-organization" />
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <Label htmlFor="invite-organization">Organization Account</Label>
-                  </div>
-                )}
+                {/* Only allow organization invites for global super_admins or actual organization accounts.
+                    Hide the organization option for hub-scoped contexts and for users that are hub admins/managers. */}
+                {(() => {
+                  const isSuperAdmin = !!userProfile?.roles?.some(r => r.role === 'super_admin');
+                  const isOrgAccount = userProfile?.account_type === 'organization';
+                  const isHubScopedAdmin = !!userProfile?.roles?.some(r => ['hub_manager', 'admin'].includes(r.role));
+
+                  // Visible only when not hub-scoped (no hubId), the user is NOT a hub admin/manager,
+                  // and user is either super_admin or an organization account.
+                  if (!hubId && !isHubScopedAdmin && (isSuperAdmin || isOrgAccount)) {
+                    return (
+                      <div className="flex items-center space-x-2 p-2 rounded border hover:bg-accent/50">
+                        <RadioGroupItem value="organization" id="invite-organization" />
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <Label htmlFor="invite-organization">Organization Account</Label>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </RadioGroup>
             </div>
 
@@ -379,6 +516,21 @@ export function InviteCodeManager() {
           </div>
         </CardContent>
       </Card>
+      {/* Delete confirmation modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Invite</DialogTitle>
+          </DialogHeader>
+          <div className="p-2">
+            <p className="text-sm">Are you sure you want to delete this invite code? This action cannot be undone.</p>
+            <div className="flex gap-2 justify-end mt-4">
+              <Button variant="ghost" onClick={() => { setShowDeleteModal(false); setInviteToDelete(null); }}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmDeleteInvite}>Delete</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Registration link modal shown after creating an invite */}
       <Dialog open={showRegistrationLinkModal} onOpenChange={setShowRegistrationLinkModal}>
@@ -499,6 +651,15 @@ export function InviteCodeManager() {
                         title="Send invite email"
                       >
                         <Mail className="w-4 h-4" />
+                      </Button>
+                      {/* Delete invite - shown to admins/hub managers */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteInvite(invite.id)}
+                        title="Delete invite code"
+                      >
+                        <XCircle className="w-4 h-4 text-destructive" />
                       </Button>
                     </TableCell>
                   </TableRow>

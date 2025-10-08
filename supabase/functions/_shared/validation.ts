@@ -38,6 +38,8 @@ export const updateUserRoleSchema = z.object({
   userId: uuidSchema,
   role: z.enum(['entrepreneur', 'hub_manager', 'admin', 'super_admin']),
   action: z.enum(['add', 'remove']),
+  // Optional hub context for hub-scoped roles
+  hub_id: z.string().uuid().optional(),
 });
 
 export const getUsersQuerySchema = z.object({
@@ -45,6 +47,8 @@ export const getUsersQuerySchema = z.object({
   search: z.string().optional(),
   role: z.enum(['entrepreneur', 'hub_manager', 'admin', 'super_admin']).optional(),
   accountType: z.enum(['business', 'organization', 'individual']).optional(),
+  // Optional hub scoping (UUID)
+  hubId: z.string().uuid().optional(),
 });
 
 // ==========================================
@@ -132,7 +136,7 @@ export const createInviteCodeSchema = z.object({
   invited_email: emailSchema,
   account_type: z.enum(['business', 'organization']).default('business'),
   // Optional hub context; when provided, associates the invite with a hub
-  hub_id: z.string().uuid().optional(),
+  hub_id: z.string().uuid().nullable().optional(),
   // Optional explicit expiry in ISO string; default will be applied server-side
   expires_at: z.string().datetime().optional(),
 });

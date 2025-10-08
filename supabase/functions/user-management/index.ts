@@ -146,15 +146,21 @@ async function createInvite(req: Request): Promise<Response> {
   const code = (Math.random().toString(36).substring(2, 8) + '-' + Math.random().toString(36).substring(2, 8)).toUpperCase();
   const expiresAt = body.expires_at || new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(); // 14 days default
 
+  // Only allow explicit hub_id when creator is super_admin. Otherwise, use inviterHubId (if any).
+  const hubToPersist = user.roles.includes('super_admin') ? (body.hub_id || null) : inviterHubId;
+
+  const insertPayload: any = {
+    code,
+    invited_email: body.invited_email,
+    account_type: body.account_type,
+    created_by: user.id,
+    expires_at: expiresAt,
+  };
+  if (hubToPersist) insertPayload.hub_id = hubToPersist;
+
   const { data, error } = await supabase
     .from('invite_codes')
-    .insert({
-      code,
-      invited_email: body.invited_email,
-      account_type: body.account_type,
-      created_by: user.id,
-      expires_at: expiresAt,
-    })
+    .insert(insertPayload)
     .select('*')
     .single();
 
@@ -449,7 +455,7 @@ async function getUsers(req: Request): Promise<Response> {
 
   const url = new URL(req.url);
   const query = validateQuery(url, getUsersQuerySchema) as z.infer<typeof getUsersQuerySchema>;
-  const { page, limit, search, role, accountType } = query;
+  const { page, limit, search, role, accountType, hubId } = query;
   
   const offset = (page - 1) * limit;
 
@@ -465,6 +471,78 @@ async function getUsers(req: Request): Promise<Response> {
       organization_name, 
       created_at
     `);
+
+  // Hub scoping behavior:
+  // - If hubId query param provided: enforce RBAC for that hub (existing behavior)
+  // - If hubId NOT provided and requester is NOT super_admin: default to scoping to the hubs the requester manages
+  //   * If requester manages no hubs, return an empty paginated response (safer than exposing global list)
+  if (hubId) {
+    // If not super_admin, ensure requester has a role tied to the hub
+    const isSuper = user.roles.includes('super_admin');
+    if (!isSuper) {
+      // Check requester user_roles for the target hub
+      const { data: requesterRoles, error: requesterRolesErr } = await supabase
+        .from('user_roles')
+        .select('role, hub_id')
+        .eq('user_id', user.id)
+        .eq('hub_id', hubId);
+      if (requesterRolesErr) throw requesterRolesErr;
+      const allowed = (requesterRoles || []).some((r: any) => ['admin', 'hub_manager'].includes(r.role));
+      if (!allowed) {
+        throw new AuthError('Not authorized to view users for this hub', 403);
+      }
+    }
+
+    // Restrict profiles to users who have roles in this hub
+    dbQuery = supabase
+      .from('profiles')
+      .select(`
+        id, 
+        email, 
+        full_name, 
+        account_type, 
+        country, 
+        organization_name, 
+        created_at
+      `)
+      .in('id', supabase.from('user_roles').select('user_id').eq('hub_id', hubId)) as any;
+  } else {
+    // No hubId provided. If requester is super_admin, allow global listing (no change).
+    const isSuper = user.roles.includes('super_admin');
+    if (!isSuper) {
+      // Determine hubs the requester administers
+      const { data: myHubRoles, error: myHubRolesErr } = await supabase
+        .from('user_roles')
+        .select('hub_id, role')
+        .eq('user_id', user.id);
+      if (myHubRolesErr) throw myHubRolesErr;
+
+      const adminHubIds = (myHubRoles || [])
+        .filter((r: any) => ['admin', 'hub_manager'].includes(r.role) && r.hub_id)
+        .map((r: any) => r.hub_id)
+        .filter(Boolean);
+
+      if (adminHubIds.length === 0) {
+        // Return empty paginated response
+        return paginatedResponse([], { page, limit, total: 0 });
+      }
+
+      // Restrict to users who have roles in any of the adminHubIds
+      dbQuery = supabase
+        .from('profiles')
+        .select(`
+          id, 
+          email, 
+          full_name, 
+          account_type, 
+          country, 
+          organization_name, 
+          created_at
+        `)
+        .in('id', supabase.from('user_roles').select('user_id').in('hub_id', adminHubIds)) as any;
+    }
+    // else super admin -> leave dbQuery as global profiles select
+  }
 
   // Apply filters
   if (search) {
@@ -538,19 +616,37 @@ async function updateUserRole(req: Request): Promise<Response> {
   const { user, supabase } = await getUserFromRequest(req);
   requireAdmin(user);
 
-  const { userId, role, action } = await validateBody(req, updateUserRoleSchema) as z.infer<typeof updateUserRoleSchema>;
+  const { userId, role, action, hub_id } = await validateBody(req, updateUserRoleSchema) as z.infer<typeof updateUserRoleSchema>;
   
   // Super admin role changes require super admin privileges
   if (role === 'super_admin') {
     requireSuperAdmin(user);
   }
 
+  // If hub-scoped role change, enforce that requester is allowed to modify roles for that hub
+  if (hub_id && (role === 'hub_manager' || role === 'entrepreneur')) {
+    const isSuper = user.roles.includes('super_admin');
+    if (!isSuper) {
+      // Check that requester has admin/hub_manager role for the target hub
+      const { data: requesterHubRoles, error: reqHubErr } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('hub_id', hub_id);
+      if (reqHubErr) throw reqHubErr;
+      const allowed = (requesterHubRoles || []).some((r: any) => ['admin', 'hub_manager'].includes(r.role));
+      if (!allowed) {
+        throw new AuthError('Not authorized to assign roles for this hub', 403);
+      }
+    }
+  }
+
   // Use the secure RPC functions from the database
   const rpcFunction = action === 'add' 
     ? 'add_user_role_with_audit' 
     : 'remove_user_role_with_audit';
-
-  const rpcParams = action === 'add' 
+  // Include optional hub_id for hub-scoped roles
+  const rpcParams: Record<string, unknown> = action === 'add'
     ? {
         target_user_id: userId,
         new_role: role,
@@ -563,6 +659,10 @@ async function updateUserRole(req: Request): Promise<Response> {
         requester_ip: null,
         requester_user_agent: req.headers.get('user-agent'),
       };
+
+  if (hub_id && (role === 'hub_manager' || role === 'entrepreneur')) {
+    rpcParams['hub_id'] = hub_id;
+  }
 
   const { data, error } = await supabase.rpc(rpcFunction, rpcParams);
 

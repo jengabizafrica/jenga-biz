@@ -253,12 +253,14 @@ class EdgeFunctionsApiClient {
     search?: string;
     role?: string;
     accountType?: string;
+    hubId?: string;
   } = {}): Promise<PaginatedResponse<User>> {
     const queryParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) queryParams.set(key, String(value));
     });
 
+    // If a hubId is provided, include it as a query param for server-side scoping
     return this.request<PaginatedResponse<User>>(
       `user-management?${queryParams.toString()}`
     );

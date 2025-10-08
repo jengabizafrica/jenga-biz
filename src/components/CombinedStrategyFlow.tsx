@@ -289,6 +289,10 @@ const CombinedStrategyFlow = ({
       try { await loadStrategies(); } catch (e) { /* ignore refresh errors */ }
       if (result && result.strategy && typeof setCurrentStrategy === 'function') {
         setCurrentStrategy(result.strategy);
+        try {
+          // Update the URL so milestones/financials have a strategy_id source immediately
+          navigate(`/strategy?id=${result.strategy.id}&tab=milestones`);
+        } catch {}
       }
 
       toast({ title: 'Success', description: 'Your strategy and business information have been saved successfully.' });
@@ -427,7 +431,11 @@ const CombinedStrategyFlow = ({
         await deleteStrategy(currentStrategy.id);
       }
       toast({ title: 'Strategy deleted', description: 'The strategy has been successfully deleted.' });
-      handleHome();
+      try {
+        navigate('/dashboard');
+      } catch (err) {
+        window.location.href = '/dashboard';
+      }
     } catch (error) {
       console.error('Failed to delete strategy:', error);
       toast({ title: 'Error', description: 'Failed to delete the strategy. Please try again.', variant: 'destructive' });
@@ -468,18 +476,6 @@ const CombinedStrategyFlow = ({
                   {t.home}
                 </Button>
 
-                {/* Delete button - only show when there's a current strategy */}
-                {currentStrategy?.id && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    className="flex items-center gap-2 text-xs sm:text-sm"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Strategy
-                  </Button>
-                )}
               </div>
             </div>
 
@@ -615,7 +611,7 @@ const CombinedStrategyFlow = ({
           <section id="milestones-section">
             <BusinessMilestonesSection
               isPro={true}
-              strategyData={strategy}
+              strategyData={{ ...strategy, id: currentStrategy?.id }}
               language={language}
               onMilestonesChange={handleMilestonesChange}
             />
@@ -668,14 +664,16 @@ const CombinedStrategyFlow = ({
           <div className="border-t border-gray-200"></div>
 
           {/* Financial Tracker Section */}
+          {currentStrategy?.id && (
           <section id="financial-tracker-section">
             <FinancialTracker
               language={language}
               currency={currency}
               currencySymbol={currencySymbol}
-              strategyId={currentStrategy?.id}
+              strategyId={currentStrategy.id}
             />
           </section>
+          )}
 
           {/* Financial Summary */}
           <div className="bg-white rounded-lg p-6 shadow-sm border">

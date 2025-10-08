@@ -168,10 +168,11 @@ const FinancialTracker = ({
   const netProfit = totalIncome - totalExpenses;
 
   const addTransaction = async () => {
-    if (!newTransaction.amount || !newTransaction.category) {
+    // Validate amount; allow default category per type if not selected
+    if (!newTransaction.amount) {
       toast({
         title: "Error",
-        description: "Please fill in all fields",
+        description: "Please enter an amount",
         variant: "destructive"
       });
       return;
@@ -186,13 +187,16 @@ const FinancialTracker = ({
       return;
     }
 
+    const fallbackCategory = newTransaction.type === 'income' ? 'Cash' : 'Operational';
+    const effectiveCategory = newTransaction.category || fallbackCategory;
+
     try {
       const transaction: Transaction = {
         id: Date.now().toString(),
         type: newTransaction.type,
         amount: parseFloat(newTransaction.amount),
         description: newTransaction.description || `${newTransaction.type} - ${format(new Date(), 'MMM dd')}`,
-        category: newTransaction.category,
+        category: effectiveCategory,
         date: new Date()
       };
 
@@ -205,7 +209,7 @@ const FinancialTracker = ({
           transaction_type: newTransaction.type,
           amount: parseFloat(newTransaction.amount),
           description: transaction.description,
-          category: newTransaction.category,
+          category: effectiveCategory,
           currency: currency,
           transaction_date: new Date().toISOString().split('T')[0]
         });

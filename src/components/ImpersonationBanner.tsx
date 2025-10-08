@@ -1,3 +1,4 @@
+// React is available via the JSX runtime; no default import required.
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,3 +41,5 @@ export function ImpersonationBanner() {
     </Alert>
   );
 }
+
+export default ImpersonationBanner;

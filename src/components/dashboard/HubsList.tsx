@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { useRoles } from '@/hooks/useRoles';
 
 type Hub = {
   id: string;
@@ -29,7 +30,15 @@ export const HubsList: React.FC = () => {
     staleTime: 30000,
   });
 
+  const { roles } = useRoles();
+
+  const canImpersonate = roles.includes('super_admin');
+
   const handleImpersonate = async (hub: Hub) => {
+    if (!canImpersonate) {
+      toast({ title: 'Unauthorized', description: 'You are not allowed to impersonate hubs', variant: 'destructive' });
+      return;
+    }
     try {
       const { startImpersonation } = await import('@/lib/tenant');
       const result = await startImpersonation(hub.id);
@@ -78,7 +87,11 @@ export const HubsList: React.FC = () => {
                       <div className="text-sm text-muted-foreground">{hub.id}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={() => handleImpersonate(hub)}>Impersonate</Button>
+                      {canImpersonate ? (
+                        <Button size="sm" onClick={() => handleImpersonate(hub)}>Impersonate</Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" disabled>Impersonate</Button>
+                      )}
                     </div>
                   </div>
                 ))

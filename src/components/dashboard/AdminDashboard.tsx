@@ -361,20 +361,24 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
                 Templates
               </TabsTrigger>
             )}
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Settings
-            </TabsTrigger>
+            {isSuperAdmin && (
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Settings
+              </TabsTrigger>
+            )}
             {isSuperAdmin && (
               <TabsTrigger value="subscriptions" className="flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
                 Subscription Plans
               </TabsTrigger>
             )}
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Analytics
-            </TabsTrigger>
+            {isSuperAdmin && (
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Analytics
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="users" className="space-y-6">
@@ -397,47 +401,46 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
             </TabsContent>
           )}
 
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-                <CardDescription>
-                  Configure system-wide settings and preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-medium">Auto-approve Organization Accounts</h3>
-                      <p className="text-sm text-muted-foreground">When enabled, newly registered ecosystem enablers will be activated automatically. Otherwise, they will remain pending approval.</p>
+          {isSuperAdmin && (
+            <TabsContent value="settings" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>System Settings</CardTitle>
+                  <CardDescription>
+                    Configure system-wide settings and preferences
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium">Auto-approve Organization Accounts</h3>
+                        <p className="text-sm text-muted-foreground">When enabled, newly registered ecosystem enablers will be activated automatically. Otherwise, they will remain pending approval.</p>
+                      </div>
+                      <div>
+                        {/* Switch */}
+                        <Switch
+                          checked={autoApproveOrgs}
+                          onCheckedChange={(val: any) => setAutoApproveOrgs(!!val)}
+                          disabled={!isSuperAdmin || settingsLoading}
+                        />
+                      </div>
                     </div>
                     <div>
-                      {/* Switch */}
-                      <Switch
-                        checked={autoApproveOrgs}
-                        onCheckedChange={(val: any) => setAutoApproveOrgs(!!val)}
-                        disabled={!isSuperAdmin || settingsLoading}
-                      />
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          onClick={saveSettings}
+                          disabled={!isSuperAdmin || settingsLoading}
+                        >
+                          {settingsLoading ? 'Saving...' : 'Save'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    {!isSuperAdmin && (
-                      <p className="text-sm text-muted-foreground">Only super admins can change this setting.</p>
-                    )}
-                    <div className="mt-2 flex gap-2">
-                      <Button
-                        onClick={saveSettings}
-                        disabled={!isSuperAdmin || settingsLoading}
-                      >
-                        {settingsLoading ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {isSuperAdmin && (
             <TabsContent value="subscriptions" className="space-y-6">
@@ -445,10 +448,12 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
             </TabsContent>
           )}
 
-          <TabsContent value="analytics" className="space-y-6">
-            {/* Super Admin: list of organizations (hubs) for impersonation */}
-            <HubsList />
-          </TabsContent>
+          {isSuperAdmin && (
+            <TabsContent value="analytics" className="space-y-6">
+              {/* Super Admin: list of organizations (hubs) for impersonation */}
+              <HubsList />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>

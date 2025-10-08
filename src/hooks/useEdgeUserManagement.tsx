@@ -189,11 +189,12 @@ export function useUserManagement(params: {
   search?: string;
   role?: string;
   hideSuperAdmins?: boolean;
+  hubId?: string | null;
 } = {}) {
   const { hideSuperAdmins, ...queryParams } = params;
   
   // Fetch users data
-  const usersQuery = useUsers(queryParams);
+  const usersQuery = useUsers(queryParams as any);
   
   // Mutation hooks
   const updateUserRoleMutation = useUpdateUserRole();

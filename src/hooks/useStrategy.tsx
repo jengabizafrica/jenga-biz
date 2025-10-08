@@ -371,11 +371,12 @@ export const useStrategy = () => {
   };
 
   // Save milestone - simplified version
-  const saveMilestone = async (milestone: Omit<Milestone, 'id' | 'created_at' | 'updated_at' | 'strategy_id' | 'business_id'> & { 
+  const saveMilestone = async (milestone: Omit<Milestone, 'id' | 'created_at' | 'updated_at' | 'strategy_id' | 'business_id'> & {
     id?: string;
     strategy_id?: string;
   }) => {
-    if (!user || !currentStrategy?.id) return null;
+    // Require authenticated user only; strategy may be provided via payload
+    if (!user) return null;
 
     const milestoneData: any = {
       id: milestone.id,
@@ -451,16 +452,11 @@ export const useStrategy = () => {
     // If user is undefined, keep loading state
   }, [user]);
 
-  // Set currentStrategy after strategies load
+  // Maintain currentStrategy without auto-selecting to avoid cross-strategy leakage
   useEffect(() => {
     if (!loading) {
-      // If we have strategies and no currentStrategy selected, pick the first
-      if (strategies.length > 0 && currentStrategy == null) {
-        setCurrentStrategy(strategies[0]); // Auto-select first strategy
-      }
-
-      // If there are no strategies but we currently have one selected, clear it
-      else if (strategies.length === 0 && currentStrategy != null) {
+      // Clear selection if strategies list becomes empty
+      if (strategies.length === 0 && currentStrategy != null) {
         setCurrentStrategy(null);
       }
     }

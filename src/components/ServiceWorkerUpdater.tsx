@@ -38,7 +38,11 @@ export function ServiceWorkerUpdater() {
     // Check for updates immediately
     navigator.serviceWorker.getRegistration().then(registration => {
       if (registration) {
-        registration.update().catch(console.error);
+        registration.update().catch((err) => {
+          // Ignore InvalidStateError often thrown in dev when SW is in a bad state
+          if (err && err.name === 'InvalidStateError') return;
+          console.error(err);
+        });
       }
     });
 
@@ -52,7 +56,10 @@ export function ServiceWorkerUpdater() {
     const updateInterval = setInterval(() => {
       navigator.serviceWorker.getRegistration().then(registration => {
         if (registration) {
-          registration.update().catch(console.error);
+          registration.update().catch((err) => {
+            if (err && err.name === 'InvalidStateError') return;
+            console.error(err);
+          });
         }
       });
     }, 60 * 60 * 1000);

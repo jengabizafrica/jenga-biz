@@ -33,6 +33,102 @@ function generateInviteCode(length = 10): string {
   return result;
 }
 
+// GET /invite-codes?hub_id=<uuid>&limit=&offset=
+async function listInviteCodes(req: Request): Promise<Response> {
+  const { user, supabase } = await getUserFromRequest(req);
+  requireAdmin(user);
+
+  const url = new URL(req.url);
+  const hubId = url.searchParams.get('hub_id');
+  const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+  const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+
+  // If hubId provided, enforce that non-super_admins can only query their own hubs
+  const isSuper = user.roles.includes('super_admin');
+  if (hubId && !isSuper) {
+    // Check requester roles for that hub
+    const { data: requesterRoles, error: reqRolesErr } = await supabase
+      .from('user_roles')
+      .select('role, hub_id')
+      .eq('user_id', user.id)
+      .eq('hub_id', hubId);
+    if (reqRolesErr) throw reqRolesErr;
+    const allowed = (requesterRoles || []).some((r: any) => ['admin', 'hub_manager'].includes(r.role));
+    if (!allowed) return errorResponse('FORBIDDEN', 'Not authorized to view invites for this hub', 403);
+  }
+
+  // Use service role client for schema probing and listing to bypass RLS and ensure server-side scoping
+  let serviceClient;
+  try {
+    serviceClient = getServiceRoleClient();
+  } catch (e) {
+    console.error('Service role client unavailable for listing invites', e);
+    return errorResponse('MISSING_SERVICE_ROLE', 'Service role key not configured for list operation', 500);
+  }
+
+  // Detect whether the invite_codes table has a hub_id column in this DB
+  let hasHubIdColumn = true;
+  try {
+    // simple probe: attempt to select hub_id with a limit 1 using service client
+    const probe = await serviceClient.from('invite_codes').select('hub_id').limit(1).maybeSingle();
+    if ((probe as any).error) {
+      throw (probe as any).error;
+    }
+  } catch (probeErr) {
+    // If the probe failed due to missing column, we'll treat the table as org-only
+    hasHubIdColumn = false;
+  }
+
+  // If no hubId provided:
+  // - If requester is NOT super_admin: default to hubs the requester administers
+  // - If requester IS super_admin: default to organization-level invites only (hub_id IS NULL)
+  let hubFilter: string[] | null = null;
+  let superDefaultToOrgs = false;
+  if (!hubId) {
+    if (!isSuper) {
+      const { data: myHubRoles, error: myHubRolesErr } = await supabase
+        .from('user_roles')
+        .select('hub_id, role')
+        .eq('user_id', user.id);
+      if (myHubRolesErr) throw myHubRolesErr;
+      const adminHubIds = (myHubRoles || []).filter((r: any) => ['admin', 'hub_manager'].includes(r.role) && r.hub_id).map((r: any) => r.hub_id).filter(Boolean);
+      if (adminHubIds.length === 0) {
+        return successResponse({ invites: [], meta: { total: 0, limit, offset } });
+      }
+      hubFilter = adminHubIds as string[];
+    } else {
+      // super admin with no hubId: default to organization invites only (hub_id IS NULL)
+      superDefaultToOrgs = true;
+    }
+  }
+
+  // Build query (use service client and .range for paging in this runtime)
+  const start = offset;
+  const end = offset + Math.max(0, limit - 1);
+  let query = serviceClient.from('invite_codes').select('*').order('created_at', { ascending: false }).range(start, end);
+  if (!hasHubIdColumn) {
+    // Table has no hub_id column; only organization-level invites are possible
+    // Respect request: if hubId was requested, it's not found -> forbidden
+    if (hubId) {
+      return errorResponse('BAD_REQUEST', 'This deployment does not support hub-scoped invites', 400);
+    }
+    // proceed to select all invites (considered org-level)
+  } else {
+    if (hubId) {
+      query = query.eq('hub_id', hubId);
+    } else if (hubFilter) {
+      query = query.in('hub_id', hubFilter as any);
+    } else if (superDefaultToOrgs) {
+      query = query.is('hub_id', null);
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return successResponse({ invites: data || [], meta: { total: (data || []).length, limit, offset } });
+}
+
 const handler = async (req: Request): Promise<Response> => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -50,6 +146,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (method === 'POST' && path === 'invite-codes') {
       return await createInviteCode(req);
+    }
+
+    if (method === 'GET' && path === 'invite-codes') {
+      return await listInviteCodes(req);
+    }
+
+    if (method === 'DELETE' && path === 'invite-codes') {
+      return await deleteInviteCode(req);
     }
 
     if (method === 'GET' && path === 'validate') {
@@ -96,15 +200,21 @@ async function createInviteCode(req: Request): Promise<Response> {
   const code = generateInviteCode(12);
   const expiresAt = body.expires_at || new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(); // 14 days default
 
+  // Only allow explicit hub_id when creator is super_admin. Otherwise, use inviterHubId (if any).
+  const hubToPersist = user.roles.includes('super_admin') ? (body.hub_id || null) : inviterHubId;
+
+  const insertPayload: any = {
+    code,
+    invited_email: body.invited_email,
+    account_type: body.account_type,
+    created_by: user.id,
+    expires_at: expiresAt,
+  };
+  if (hubToPersist) insertPayload.hub_id = hubToPersist;
+
   const { data, error } = await supabase
     .from('invite_codes')
-    .insert({
-      code,
-      invited_email: body.invited_email,
-      account_type: body.account_type,
-      created_by: user.id,
-      expires_at: expiresAt,
-    })
+    .insert(insertPayload)
     .select('*')
     .single();
 
@@ -274,3 +384,89 @@ async function consumeInviteCode(req: Request): Promise<Response> {
 }
 
 serve(handler);
+
+// DELETE /invite-codes?id=<uuid>
+async function deleteInviteCode(req: Request): Promise<Response> {
+  const { user, supabase } = await getUserFromRequest(req);
+  // require at least admin privileges
+  requireAdmin(user);
+
+  const url = new URL(req.url);
+  const schema = z.object({ id: z.string().uuid() });
+  const { id } = validateQuery(url, schema) as { id: string };
+
+  // Fetch the invite
+  const { data: invite, error: inviteErr } = await supabase
+    .from('invite_codes')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (inviteErr) throw inviteErr;
+  if (!invite) return errorResponse('NOT_FOUND', 'Invite not found', 404);
+
+  // Determine the hub context of the invite creator (if any)
+  let creatorHubId: string | null = null;
+  try {
+    const { data: creatorRoles } = await supabase
+      .from('user_roles')
+      .select('hub_id, role')
+      .eq('user_id', invite.created_by);
+    const hubCtx = (creatorRoles || []).find((r: any) => (r.role === 'hub_manager' || r.role === 'admin') && r.hub_id);
+    creatorHubId = hubCtx?.hub_id || null;
+  } catch (e) {
+    // ignore and continue; creatorHubId will be null
+    console.error('Error fetching creator roles for invite deletion', e);
+  }
+
+  // Authorization: allow if super admin OR if current user is admin/hub_manager for the same hub
+  let allowed = false;
+  try {
+    // If super admin, allow
+    try {
+      requireSuperAdmin(user);
+      allowed = true;
+    } catch (_err) {
+      // not super admin
+    }
+
+    if (!allowed) {
+      // if invite tied to a hub, check current user's roles for same hub
+      if (creatorHubId) {
+        const { data: myRoles, error: myRolesErr } = await supabase
+          .from('user_roles')
+          .select('hub_id, role')
+          .eq('user_id', user.id);
+        if (myRolesErr) throw myRolesErr;
+        const hasHubAdmin = (myRoles || []).some((r: any) => (r.role === 'hub_manager' || r.role === 'admin') && r.hub_id === creatorHubId);
+        if (hasHubAdmin) allowed = true;
+      }
+    }
+  } catch (e) {
+    console.error('Error evaluating delete authorization', e);
+    return errorResponse('FORBIDDEN', 'Not authorized to delete this invite', 403);
+  }
+
+  if (!allowed) {
+    return errorResponse('FORBIDDEN', 'Not authorized to delete this invite', 403);
+  }
+
+  // Perform hard deletion using the service-role client to bypass RLS and ensure the function can delete invites
+  try {
+    const serviceClient = getServiceRoleClient();
+
+    const { error: delErr } = await serviceClient
+      .from('invite_codes')
+      .delete()
+      .eq('id', id);
+
+    if (delErr) {
+      console.error('Service client delete error for invite:', delErr);
+      return errorResponse('DELETE_FAILED', 'Failed to delete invite code', 500);
+    }
+
+    return successResponse({ deleted: true });
+  } catch (e) {
+    console.error('Failed to delete invite using service role client:', e);
+    return errorResponse('DELETE_FAILED', 'Failed to delete invite code', 500);
+  }
+}

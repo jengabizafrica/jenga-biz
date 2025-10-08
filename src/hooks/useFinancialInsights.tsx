@@ -60,14 +60,21 @@ export const useFinancialInsights = (businessId?: string) => {
       const hubId = getCurrentHubIdFromStorage();
       // Prefer aggregated financial_records (daily business-level snapshots)
       try {
-        let frQuery = supabase
-          .from('financial_records')
+        // Prefer aggregated financial_records (daily business-level snapshots)
+        // If hubId is present, use the view that joins businesses to expose hub_id
+        let frSource = 'financial_records';
+        if (hubId) frSource = 'financial_records_with_hub';
+
+        // supabase client types expect literal table names; use any for dynamic source
+        let frQuery = (supabase as any)
+          .from(frSource)
           .select('*')
           .order('record_date', { ascending: false });
 
         if (businessId) frQuery = frQuery.eq('business_id', businessId);
         else if (hubId) {
-          // financial_records does not have hub_id by default; leave as-is
+          // The view exposes hub_id so filter by it
+          frQuery = frQuery.eq('hub_id', hubId as any);
         }
 
         const { data: frData, error: frError } = await frQuery;

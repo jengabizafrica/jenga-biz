@@ -69,7 +69,24 @@ export function HubContextProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    refreshContext();
+    // Only refresh context after auth session exists to avoid calling
+    // the impersonation functions without an Authorization header which
+    // will return 500s in the browser console for unauthenticated users.
+    (async () => {
+      try {
+        const { data: { session } } = await (await import('@/integrations/supabase/client')).supabase.auth.getSession();
+        if (session && session.user) {
+          refreshContext();
+        } else {
+          // No session yet: set loading false and skip refresh
+          setLoading(false);
+        }
+      } catch (err) {
+        console.debug('Could not check session before refreshing hub context', err);
+        // fallback to attempting refresh but keep UI stable
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const value: HubContextType = {

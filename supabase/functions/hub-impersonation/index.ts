@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getUserFromRequest, requireSuperAdmin } from '../_shared/auth.ts';
+import { getUserFromRequest, requireSuperAdmin, AuthError } from '../_shared/auth.ts';
 import { corsHeaders } from '../_shared/responses.ts';
 import { env } from '../_shared/env.ts';
 
@@ -16,7 +16,11 @@ serve(async (req) => {
   }
 
   try {
-    const { user, supabase } = await getUserFromRequest(req);
+  // Debug: log whether Authorization header is present to help diagnose CORS/preflight issues
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) console.debug('hub-impersonation: Authorization header missing on request');
+
+  const { user, supabase } = await getUserFromRequest(req);
     const config = env.getConfig();
 
     if (req.method === 'POST') {
@@ -123,11 +127,14 @@ serve(async (req) => {
       { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Hub impersonation error:', error);
+    const status = (error instanceof AuthError && error.status) ? error.status : 500;
+    const payload: any = { error: error?.message || String(error) };
+    if (error?.code) payload.code = error.code;
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify(payload),
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
