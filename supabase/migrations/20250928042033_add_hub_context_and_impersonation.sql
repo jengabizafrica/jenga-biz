@@ -150,96 +150,108 @@ END;
 $$;
 
 -- Update businesses RLS policies to include hub scoping
-DROP POLICY IF EXISTS "Users can view their own businesses" ON public.businesses;
-DROP POLICY IF EXISTS "Users can update their own businesses" ON public.businesses;
-
+-- Update businesses RLS policies to include hub scoping
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'businesses' AND policyname = 'Users can view their own businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can view their own businesses or hub businesses" ON public.businesses FOR SELECT USING (user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))';
-  END IF;
-END $$;
+  IF to_regclass('public.businesses') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Users can view their own businesses" ON public.businesses;
+    DROP POLICY IF EXISTS "Users can update their own businesses" ON public.businesses;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'businesses' AND policyname = 'Users can update their own businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can update their own businesses or hub businesses" ON public.businesses FOR UPDATE USING (user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))';
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'businesses' AND policyname = 'Users can view their own businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can view their own businesses or hub businesses" ON public.businesses FOR SELECT USING (user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'businesses' AND policyname = 'Users can update their own businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can update their own businesses or hub businesses" ON public.businesses FOR UPDATE USING (user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))';
+    END IF;
   END IF;
 END $$;
 
 -- Update financial_records RLS to include hub scoping
-DROP POLICY IF EXISTS "Users can manage financial records for their businesses" ON public.financial_records;
-
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'financial_records' AND policyname = 'Users can manage financial records for their businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can manage financial records for their businesses or hub businesses" ON public.financial_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = financial_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+  IF to_regclass('public.financial_records') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Users can manage financial records for their businesses" ON public.financial_records;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'financial_records' AND policyname = 'Users can manage financial records for their businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can manage financial records for their businesses or hub businesses" ON public.financial_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = financial_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+    END IF;
   END IF;
 END $$;
 
 -- Update other business-related tables with hub scoping
-DROP POLICY IF EXISTS "Users can manage milestones for their businesses" ON public.business_milestones;
-
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_milestones' AND policyname = 'Users can manage milestones for their businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can manage milestones for their businesses or hub businesses" ON public.business_milestones FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = business_milestones.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+  IF to_regclass('public.business_milestones') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Users can manage milestones for their businesses" ON public.business_milestones;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_milestones' AND policyname = 'Users can manage milestones for their businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can manage milestones for their businesses or hub businesses" ON public.business_milestones FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = business_milestones.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+    END IF;
   END IF;
 END $$;
 
 -- Update business_survival_records
-DROP POLICY IF EXISTS "Users can manage survival records for their businesses" ON public.business_survival_records;
-
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_survival_records' AND policyname = 'Users can manage survival records for their businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can manage survival records for their businesses or hub businesses" ON public.business_survival_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = business_survival_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+  IF to_regclass('public.business_survival_records') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Users can manage survival records for their businesses" ON public.business_survival_records;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_survival_records' AND policyname = 'Users can manage survival records for their businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can manage survival records for their businesses or hub businesses" ON public.business_survival_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = business_survival_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+    END IF;
   END IF;
 END $$;
 
 -- Update finance_access_records
-DROP POLICY IF EXISTS "Users can manage finance access records for their businesses" ON public.finance_access_records;
-
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'finance_access_records' AND policyname = 'Users can manage finance access records for their businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can manage finance access records for their businesses or hub businesses" ON public.finance_access_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = finance_access_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+  IF to_regclass('public.finance_access_records') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Users can manage finance access records for their businesses" ON public.finance_access_records;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'finance_access_records' AND policyname = 'Users can manage finance access records for their businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can manage finance access records for their businesses or hub businesses" ON public.finance_access_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = finance_access_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+    END IF;
   END IF;
 END $$;
 
 -- Update job_creation_records
-DROP POLICY IF EXISTS "Users can manage job records for their businesses" ON public.job_creation_records;
-
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'job_creation_records' AND policyname = 'Users can manage job records for their businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can manage job records for their businesses or hub businesses" ON public.job_creation_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = job_creation_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+  IF to_regclass('public.job_creation_records') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Users can manage job records for their businesses" ON public.job_creation_records;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'job_creation_records' AND policyname = 'Users can manage job records for their businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can manage job records for their businesses or hub businesses" ON public.job_creation_records FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = job_creation_records.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+    END IF;
   END IF;
 END $$;
 
 -- Update loan_readiness_assessments
-DROP POLICY IF EXISTS "Users can manage loan assessments for their businesses" ON public.loan_readiness_assessments;
-
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'loan_readiness_assessments' AND policyname = 'Users can manage loan assessments for their businesses or hub businesses'
-  ) THEN
-    EXECUTE 'CREATE POLICY "Users can manage loan assessments for their businesses or hub businesses" ON public.loan_readiness_assessments FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = loan_readiness_assessments.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+  IF to_regclass('public.loan_readiness_assessments') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Users can manage loan assessments for their businesses" ON public.loan_readiness_assessments;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'loan_readiness_assessments' AND policyname = 'Users can manage loan assessments for their businesses or hub businesses'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can manage loan assessments for their businesses or hub businesses" ON public.loan_readiness_assessments FOR ALL USING (EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = loan_readiness_assessments.business_id AND (b.user_id = auth.uid() OR is_admin_or_hub_manager(auth.uid()) OR (b.hub_id = public.get_current_hub_context() AND is_admin_or_hub_manager(auth.uid())))))';
+    END IF;
   END IF;
 END $$;
 

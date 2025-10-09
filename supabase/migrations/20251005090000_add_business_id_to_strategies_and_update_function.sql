@@ -2,11 +2,30 @@
 -- Generated: 2025-10-05
 
 -- 1) Add business_id column if not exists, reference businesses(id), cascade on delete
-ALTER TABLE public.strategies
-ADD COLUMN IF NOT EXISTS business_id uuid REFERENCES public.businesses(id) ON DELETE CASCADE;
+DO $$
+BEGIN
+  IF to_regclass('public.strategies') IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'strategies' AND column_name = 'business_id'
+    ) THEN
+      ALTER TABLE public.strategies
+      ADD COLUMN IF NOT EXISTS business_id uuid;
+    END IF;
 
--- 2) Create index for performance
-CREATE INDEX IF NOT EXISTS strategies_business_id_idx ON public.strategies(business_id);
+    -- Add FK constraint to businesses if not exists
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint WHERE conrelid = 'public.strategies'::regclass AND conname = 'fk_strategies_business'
+    ) THEN
+      ALTER TABLE public.strategies
+      ADD CONSTRAINT fk_strategies_business FOREIGN KEY (business_id) REFERENCES public.businesses(id) ON DELETE CASCADE;
+    END IF;
+
+    -- 2) Create index for performance
+    CREATE INDEX IF NOT EXISTS strategies_business_id_idx ON public.strategies(business_id);
+  ELSE
+    RAISE NOTICE 'Skipping strategies DDL: public.strategies does not exist yet.';
+  END IF;
+END $$;
 
 -- 3) Optional: add unique constraint to enforce one-to-one (uncomment if desired)
 -- ALTER TABLE public.strategies

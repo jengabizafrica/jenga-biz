@@ -1,16 +1,29 @@
 -- Add strategy_id to business_milestones
+-- Create the column first without FK so the migration is safe when public.strategies doesn't exist yet
 ALTER TABLE public.business_milestones
-ADD COLUMN IF NOT EXISTS strategy_id UUID REFERENCES public.strategies(id) ON DELETE CASCADE;
+ADD COLUMN IF NOT EXISTS strategy_id UUID;
 
 -- Create an index for better query performance
-CREATE INDEX IF NOT EXISTS idx_business_milestones_strategy_id 
-ON public.business_milestones(strategy_id);
+CREATE INDEX IF NOT EXISTS idx_business_milestones_strategy_id ON public.business_milestones(strategy_id);
+
+-- If strategies table exists, add FK constraint (idempotent)
+DO $$
+BEGIN
+    IF to_regclass('public.strategies') IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conrelid = 'public.business_milestones'::regclass AND conname = 'fk_business_milestones_strategy'
+        ) THEN
+            ALTER TABLE public.business_milestones
+            ADD CONSTRAINT fk_business_milestones_strategy FOREIGN KEY (strategy_id) REFERENCES public.strategies(id) ON DELETE CASCADE;
+        END IF;
+    END IF;
+END $$;
 
 -- Update RLS policies if they exist
 DO $$
 BEGIN
-    -- Check if RLS is enabled on the table
-    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'business_milestones') THEN
+    -- Check if RLS is enabled on the table and strategies table exists (policies reference strategies)
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'business_milestones') AND to_regclass('public.strategies') IS NOT NULL THEN
         -- Enable RLS if not already enabled
         EXECUTE 'ALTER TABLE public.business_milestones ENABLE ROW LEVEL SECURITY';
         

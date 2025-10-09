@@ -55,31 +55,161 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName, account_type: accountType, invite_code: inviteCode || undefined } }
-      } as any);
+      // If there's an invite code, prefer the server atomic signup route which performs
+      // auth creation (admin REST API) and consumes the invite server-side. This ensures
+      // the invite is marked used and server-side sends/role assignments run even when
+      // the client does not receive an access token on signup.
+      let signUpData: any = null;
+      let signUpError: any = null;
 
-      if (error) {
-        toast({ title: 'Signup failed', description: error.message, variant: 'destructive' });
+      if (inviteCode) {
+        try {
+          // Compute functions base like other client code does
+          const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
+          const getFunctionsBase = () => {
+            const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
+            if (injected) return injected.replace(/\/$/, '');
+            if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL.replace(/\/$/, '');
+            const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
+            if (ref) return `https://${ref}.functions.supabase.co`;
+            const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || '';
+            if (supabaseUrl) return supabaseUrl.replace(/\/$/, '').replace('.supabase.co', '.functions.supabase.co');
+            return window.location.origin;
+          };
+          const functionsBase = getFunctionsBase();
+
+          const anonKey = (metaEnv.VITE_SUPABASE_PUBLISHABLE_KEY || metaEnv.VITE_SUPABASE_ANON_KEY || (window as any).VITE_SUPABASE_PUBLISHABLE_KEY || '');
+          const resp = await fetch(`${functionsBase}/user-management/invite-signup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+            body: JSON.stringify({ email, password, full_name: fullName, account_type: accountType, invite_code: inviteCode }),
+          });
+
+          const body = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            signUpError = body?.error || new Error(body?.message || `Invite signup failed: ${resp.status}`);
+          } else {
+            signUpData = body;
+          }
+        } catch (e) {
+          signUpError = e;
+        }
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName, account_type: accountType } }
+        } as any);
+        signUpData = data;
+        signUpError = error;
+      }
+
+      if (signUpError) {
+        toast({ title: 'Signup failed', description: signUpError.message || String(signUpError), variant: 'destructive' });
         setLoading(false);
         return;
       }
 
       // After signUp we attempt to consume the invite using the invite-codes Edge Function
       try {
-        // fetch current user id
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && inviteCode) {
-          await apiClient.consumeInviteCode(inviteCode, user.id);
+        // Supabase may or may not create a session immediately depending on confirmation settings.
+        // Prefer the response from signUp which includes the newly created user id if available.
+        // Fallback to supabase.auth.getUser() when signUp did create a session.
+        // The goal is to always call consumeInviteCode with the created user's id so the server
+        // can mark the invite used and trigger server-side confirmation sends.
+        let createdUserId: string | null = null;
+
+        // Prefer id from the signUp response when present (works when no session is created yet)
+        if (signUpData && (signUpData as any).user && (signUpData as any).user.id) {
+          createdUserId = (signUpData as any).user.id;
+        }
+
+        // If not present in signUp response, try to read the current session user
+        if (!createdUserId) {
+          try {
+            const maybe = await supabase.auth.getUser();
+            if (maybe?.data?.user?.id) createdUserId = maybe.data.user.id;
+          } catch (_err) {
+            // ignore - we'll try other ways to obtain the id
+          }
+        }
+
+        // If no session user, attempt to use the signUp response via the GoTrue client which may
+        // expose the last signed up user via getUser or the signUp response. We'll attempt to read
+        // the `user` property returned by signUp via the `auth` state in the client (some SDK versions
+        // populate it synchronously). As a final fallback, attempt to decode the last redirect parameters
+        // or skip consume if no id is available.
+        // NOTE: This is defensive — the important change is that when signUp returns a created user id,
+        // we will use it to call consumeInviteCode.
+
+        if (!createdUserId && (window as any).__supabase_last_signup_user_id) {
+          createdUserId = (window as any).__supabase_last_signup_user_id;
+        }
+
+        // If we still don't have a user id, try reading the session again after a short delay
+        if (!createdUserId) {
+          try {
+            const retry = await supabase.auth.getUser();
+            if (retry?.data?.user?.id) createdUserId = retry.data.user.id;
+          } catch (_e) {
+            // ignore
+          }
+        }
+
+        if (createdUserId && inviteCode) {
+          // If signUp returned a session with an access_token, use it to call the functions endpoint
+          // directly with an Authorization header. This covers the case where the SDK hasn't
+          // persisted the session yet but we do have a valid token to authenticate the call.
+          const accessToken = (signUpData as any)?.session?.access_token;
+          if (accessToken) {
+            try {
+              // Compute functions base like other client code does
+              const metaEnv = (typeof import.meta !== 'undefined' ? (import.meta as any).env : {}) || {};
+              const getFunctionsBase = () => {
+                const injected = (window as any).__SUPABASE_FUNCTIONS_URL__;
+                if (injected) return injected.replace(/\/$/, '');
+                if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL.replace(/\/$/, '');
+                const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
+                if (ref) return `https://${ref}.functions.supabase.co`;
+                const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || '';
+                if (supabaseUrl) return supabaseUrl.replace(/\/$/, '').replace('.supabase.co', '.functions.supabase.co');
+                return window.location.origin;
+              };
+              const functionsBase = getFunctionsBase();
+              const resp = await fetch(`${functionsBase}/invite-codes/consume`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({ code: inviteCode, user_id: createdUserId }),
+              });
+
+              if (!resp.ok) {
+                const body = await resp.text().catch(() => '');
+                console.error('consumeInvite (with token) failed', resp.status, body);
+              }
+            } catch (e) {
+              console.error('consumeInvite (with token) error', e);
+            }
+          } else {
+            // fallback to apiClient which will use the current session if available
+            try {
+              await apiClient.consumeInviteCode(inviteCode, createdUserId);
+            } catch (e) {
+              console.error('consumeInvite error (fallback)', e);
+            }
+          }
+        } else {
+          // If we couldn't determine the created user's id, log for diagnostics but don't block UX.
+          console.debug('consumeInvite skipped: no user id available after signup', { inviteCode, createdUserId });
         }
       } catch (e) {
         // log but don't block the UX
         console.error('consumeInvite error', e);
       }
 
-      toast({ title: 'Account created', description: 'Please check your email to confirm.' });
+  toast({ title: 'Account created', description: 'Please check your email to confirm.' });
       navigate('/');
     } catch (e: any) {
       toast({ title: 'Signup error', description: e.message || 'Unknown error', variant: 'destructive' });

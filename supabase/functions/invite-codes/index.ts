@@ -266,7 +266,7 @@ async function createInviteCode(req: Request): Promise<Response> {
           console.debug('[invite-validate] send-invite-confirmation invoked');
         }
       } catch (e) {
-  console.error('[invite-validate] error invoking send-invite-confirmation', e);
+        console.error('[invite-validate] error invoking send-invite-confirmation', e);
       }
     })();
   } catch (e) {
@@ -476,6 +476,90 @@ async function consumeInviteCode(req: Request): Promise<Response> {
       throw roleErr;
     }
     linkedHubId = creatorHubId;
+  }
+
+  // If the invite is for an organization and the creator was a super_admin, auto-assign an 'admin' role
+  if (invite.account_type === 'organization') {
+    try {
+      // check if creator is super_admin by querying their roles
+      const { data: creatorRoles, error: creatorRolesErr } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', invite.created_by);
+      if (creatorRolesErr) throw creatorRolesErr;
+
+      const creatorIsSuper = (creatorRoles || []).some((r: any) => r.role === 'super_admin');
+      if (creatorIsSuper) {
+        try {
+          // Call service RPC to add role with audit
+          const serviceClient = getServiceRoleClient();
+          const { data: rpcData, error: rpcErr } = await serviceClient.rpc('service_add_user_role', {
+            target_user_id: user_id,
+            new_role: 'admin',
+            requester_user_id: invite.created_by,
+            requester_ip: null,
+            requester_user_agent: null,
+          });
+
+          if (rpcErr) {
+            if ((rpcErr as any).code !== '23505') {
+              console.error('Failed to auto-assign admin role for organization invite (rpc):', rpcErr);
+            } else {
+              console.debug('service_add_user_role: admin role already exists for user', { user_id, invite_code: code });
+            }
+          } else {
+            console.debug('Auto-assigned admin role to user from organization invite (rpc)', { user_id, invite_code: code });
+          }
+        } catch (e) {
+          console.error('Error calling service_add_user_role RPC for org invite auto-assign:', e);
+        }
+      }
+    } catch (e) {
+      console.error('Error checking creator roles for org invite auto-assign:', e);
+      // continue without failing consume
+    }
+  }
+
+  // Attempt to send signup confirmation server-side (so client doesn't need to call it)
+  try {
+    const functionsDomain = (Deno.env.get('SUPABASE_URL') || '').replace('https://', '').replace('.supabase.co', '.functions.supabase.co');
+    const sendUrl = `https://${functionsDomain}/send-signup-confirmation`;
+
+    const confirmationBase = Deno.env.get('SITE_CONFIRMATION_URL') || Deno.env.get('VITE_REDIRECT_URL') || Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || Deno.env.get('VITE_APP_URL') || '';
+    let confirmationUrl = '';
+    if (confirmationBase) {
+      const base = confirmationBase.replace(/\/$/, '');
+      const params = new URLSearchParams();
+      if (code) params.set('invite_code', code);
+      if (invite.invited_email) params.set('email', invite.invited_email);
+      confirmationUrl = `${base}?${params.toString()}`;
+    }
+
+    const payload = {
+      email: invite.invited_email || undefined,
+      confirmationUrl,
+      subject: `Welcome to ${Deno.env.get('SITE_NAME') || 'Jenga Biz'} - Confirm your email`,
+    };
+
+    (async () => {
+      try {
+        const resp = await fetch(sendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!resp.ok) {
+          const txt = await resp.text().catch(() => '');
+          console.error('[invite-codes] send-signup-confirmation failed', resp.status, txt);
+        } else {
+          console.debug('[invite-codes] send-signup-confirmation invoked');
+        }
+      } catch (e) {
+        console.error('[invite-codes] error invoking send-signup-confirmation', e);
+      }
+    })();
+  } catch (e) {
+    console.error('[invite-codes] error preparing confirmation send', e);
   }
 
   // Return assigned plan suggestion based on rules and attempt assignment when applicable

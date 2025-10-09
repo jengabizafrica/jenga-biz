@@ -315,7 +315,7 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
   // Validate invite code first using anon client
   const { data: invite, error: inviteErr } = await (await import('https://esm.sh/@supabase/supabase-js@2')).createClient(
     Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   )
   .from('invite_codes')
   .select('*')
@@ -345,7 +345,11 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
       body: JSON.stringify({
         email: body.email,
         password: body.password,
-        email_confirm: true,
+        // Do NOT auto-confirm here. Let Supabase send the canonical verification email
+        // which contains the correct /auth/v1/verify link and token. If we auto-confirm
+        // here the user will be able to sign in without verification and we lose the
+        // standard flow.
+        email_confirm: false,
         user_metadata: { full_name: body.full_name, account_type: body.account_type }
       })
     });
@@ -357,6 +361,52 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
     }
 
     createdAuthUserId = respBody.id;
+    // Log admin-create response for debugging and visibility
+    try {
+      console.debug('Admin user created via admin REST API', { id: createdAuthUserId, respBody });
+    } catch (e) {
+      // ignore
+    }
+    // Best-effort: trigger Supabase to send verification email for this user using admin endpoint.
+    // Some Supabase installations support a send_verification admin endpoint. Attempt the call
+    // with a short timeout and surface detailed debug logging. Do NOT fail signup if this fails.
+    try {
+      const sendVerifyUrl = `${config.supabaseUrl}/auth/v1/admin/users/${createdAuthUserId}/send_verification`;
+      // Abort after 3 seconds to avoid blocking the signup flow on slow network
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+
+      let sendResp: Response | null = null;
+      try {
+        sendResp = await fetch(sendVerifyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.supabaseServiceRoleKey}`,
+            'apikey': config.supabaseServiceRoleKey,
+            'x-api-key': config.supabaseServiceRoleKey,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (!sendResp) {
+        console.debug('send_verification admin endpoint did not return a response (null)');
+      } else {
+        const sendBody = await sendResp.text().catch(() => '');
+        if (!sendResp.ok) {
+          // 404/405 likely means endpoint isn't available on this Supabase deployment
+          console.debug('send_verification admin endpoint returned non-ok', { status: sendResp.status, body: sendBody });
+        } else {
+          console.debug('Triggered send_verification for created user', { id: createdAuthUserId });
+        }
+      }
+    } catch (e) {
+      // AbortError or network error - keep signup flow happy but log for debugging
+      console.debug('send_verification admin endpoint not available, timed out, or failed', e);
+    }
   } catch (e) {
     console.error('Admin user create error:', e);
     return errorResponse('AUTH_CREATE_ERROR', 'Error creating auth user', 500);
@@ -373,11 +423,21 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
       .eq('code', body.invite_code);
     if (markErr) throw markErr;
 
-    // Insert profile
-    const { error: profileErr } = await service
-      .from('profiles')
-      .insert({ id: createdAuthUserId, email: body.email, full_name: body.full_name, account_type: body.account_type, is_profile_complete: false });
-    if (profileErr) throw profileErr;
+    // Insert profile. If profile already exists (23505) treat as non-fatal and continue.
+    try {
+      const { error: profileErr } = await service
+        .from('profiles')
+        .insert({ id: createdAuthUserId, email: body.email, full_name: body.full_name, account_type: body.account_type, is_profile_complete: false });
+      if (profileErr) {
+        if ((profileErr as any).code === '23505') {
+          console.debug('Profile already exists for user; continuing without insertion', { userId: createdAuthUserId });
+        } else {
+          throw profileErr;
+        }
+      }
+    } catch (e) {
+      throw e;
+    }
 
     // If invite has hub context, assign entrepreneur role
     if ((invite as any)?.account_type === 'business') {
@@ -393,21 +453,69 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
       }
     }
 
+    // If the invite is for an organization and the invite creator was a super_admin,
+    // auto-assign a global 'admin' role to the new user. This mirrors the behavior in
+    // the invite-codes consume flow so org invites created by super_admin produce admin users.
+    if ((invite as any)?.account_type === 'organization') {
+      try {
+        // determine creator roles
+        const { data: creatorRoles, error: creatorRolesErr } = await service
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', (invite as any).created_by);
+        if (creatorRolesErr) throw creatorRolesErr;
+
+        const creatorIsSuper = (creatorRoles || []).some((r: any) => r.role === 'super_admin');
+        if (creatorIsSuper) {
+          // Use a service-side RPC to add role with audit. This ensures we have a
+          // single controlled path for role changes and better error visibility.
+          const { data: rpcData, error: rpcErr } = await service.rpc('service_add_user_role', {
+            target_user_id: createdAuthUserId,
+            new_role: 'admin',
+            requester_user_id: (invite as any).created_by,
+            requester_ip: null,
+            requester_user_agent: null,
+          });
+
+          if (rpcErr) {
+            // If it's a unique/duplicate error allow it; otherwise fail so the
+            // caller / logs will show the problem and we can remediate.
+            if ((rpcErr as any).code !== '23505') {
+              console.error('service_add_user_role RPC failed:', rpcErr);
+              throw rpcErr;
+            } else {
+              console.debug('service_add_user_role: role already exists (ignored)');
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error auto-assigning admin role for org invite:', e);
+      }
+    }
+
+    // We intentionally do NOT send a custom confirmation email here. By creating the
+    // user with `email_confirm: false`, Supabase will send the canonical verification
+    // email containing the correct `/auth/v1/verify?token=...&type=signup&redirect_to=...`
+    // link. Sending our own link risks using the wrong domain or missing the token.
+
     return successResponse({ userId: createdAuthUserId, created: true });
   } catch (dbErr) {
     console.error('DB ops after auth create failed, attempting rollback:', dbErr);
-    // Attempt to delete the created auth user to avoid orphans
+    // Only attempt to delete the created auth user when createdAuthUserId is present
+    // and the error is not a duplicate-profile (we already handled duplicates above).
     try {
-      const deleteUrl = `${config.supabaseUrl}/auth/v1/admin/users/${createdAuthUserId}`;
-      await fetch(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.supabaseServiceRoleKey}`,
-          'apikey': config.supabaseServiceRoleKey,
-          'x-api-key': config.supabaseServiceRoleKey,
-        },
-      });
+      if (createdAuthUserId) {
+        const deleteUrl = `${config.supabaseUrl}/auth/v1/admin/users/${createdAuthUserId}`;
+        await fetch(deleteUrl, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${config.supabaseServiceRoleKey}`,
+            'apikey': config.supabaseServiceRoleKey,
+            'x-api-key': config.supabaseServiceRoleKey,
+          },
+        });
+      }
     } catch (delErr) {
       console.error('Failed to rollback auth user after DB failure:', delErr);
     }

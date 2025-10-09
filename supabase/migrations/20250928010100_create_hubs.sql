@@ -16,5 +16,6 @@ CREATE TABLE IF NOT EXISTS public.hubs (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_hubs_slug ON public.hubs USING btree (slug) TABLESPACE pg_default
 WHERE (slug IS NOT NULL);
 
-CREATE TRIGGER update_hubs_updated_at BEFORE UPDATE ON public.hubs
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Trigger creation for `public.hubs` is intentionally deferred. A later migration will create
+-- the `update_hubs_updated_at` trigger after the `update_updated_at_column()` helper is defined.
+-- This avoids ordering problems when applying migrations in a fresh/shadow database.
