@@ -100,6 +100,13 @@ const handler = async (req: Request): Promise<Response> => {
       try { return `${k.slice(0,4)}...(${k.length})`; } catch { return '***'; }
     }
 
+    // Health endpoint (GET /health) to surface masked env presence without sending mail
+    if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
+      const brevoEnv = Deno.env.get('BREVO_API_KEY');
+      const sender = Deno.env.get('BREVO_SENDER_EMAIL') || 'unset';
+      return new Response(JSON.stringify({ ok: true, brevo_present: !!brevoEnv, brevo_masked: maskKey(brevoEnv) || null, sender }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
     const brevoEnv = Deno.env.get('BREVO_API_KEY');
     const brevoVite = Deno.env.get('VITE_BREVO_API_KEY');
     let brevoKey = brevoEnv || brevoVite;

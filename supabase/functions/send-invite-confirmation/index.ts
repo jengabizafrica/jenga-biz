@@ -22,8 +22,20 @@ interface InviteEmailRequest {
   html?: string;
 }
 
+function maskKey(k?: string | undefined) {
+  if (!k) return null;
+  try { return `${k.slice(0,4)}...(${k.length})`; } catch { return '***'; }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Simple health check endpoint to validate env presence without attempting sends
+  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
+    const brevoEnv = Deno.env.get('BREVO_API_KEY');
+    const sender = Deno.env.get('BREVO_SENDER_EMAIL') || 'unset';
+    return new Response(JSON.stringify({ ok: true, brevo_present: !!brevoEnv, brevo_masked: maskKey(brevoEnv) || null, sender }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  }
 
   try {
     const body: InviteEmailRequest = await req.json();
