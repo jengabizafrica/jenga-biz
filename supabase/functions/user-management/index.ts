@@ -399,6 +399,7 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
   let cachedCreatorRoles: Array<{ role: string; hub_id?: string }> | null = null;
   try {
     const fetched = await fetchUserRoles((invite as any).created_by);
+    console.debug("fetched creator roles", fetched);
     cachedCreatorRoles = fetched.roles;
     creatorIsSuper = isSuperAdminFromRoles(cachedCreatorRoles);
     creatorIsAdmin = (cachedCreatorRoles || []).some((r: any) => r.role === 'admin');
