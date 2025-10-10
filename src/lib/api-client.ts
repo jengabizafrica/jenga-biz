@@ -667,8 +667,20 @@ class EdgeFunctionsApiClient {
   // ==========================================
   async validateInviteCode(code: string): Promise<{ valid: boolean; invite?: { code: string; account_type: string; invited_email: string; expires_at: string } }> {
     const url = `invite-codes/validate?code=${encodeURIComponent(code)}`;
-    const res = await this.request<ApiResponse<{ valid: boolean; invite?: any }>>(url);
-    return (res as any)?.data ?? (res as any);
+    // Use publicRequest so that the ANON key is sent as both apikey and Authorization header
+    // Some function deployments (and reverse proxies) require an Authorization header even for public endpoints.
+    try {
+      const res = await this.publicRequest<any>(url);
+      // The function may return either { valid: boolean, invite?: {...} } or { data: { valid: ... } }
+      if (res && typeof res === 'object') {
+        if ('valid' in res) return { valid: !!res.valid, invite: res.invite } as any;
+        if (res.data && typeof res.data === 'object') return res.data as any;
+      }
+      return { valid: false } as any;
+    } catch (err) {
+      // Re-throw so callers can display appropriate UI; publicRequest already wraps errors with details
+      throw err;
+    }
   }
 
   async consumeInviteCode(code: string, userId: string): Promise<{

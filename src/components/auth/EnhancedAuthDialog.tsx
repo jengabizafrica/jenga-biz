@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Loader as Loader2, Eye, EyeOff, CircleAlert as AlertCircle, Building2, Users, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { apiClient } from '@/lib/api-client';
 import { saveProfileForUser } from '@/lib/profile';
 import { formatError } from '@/lib/formatError';
 
@@ -74,7 +75,7 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
     setPasswordStrength({ score, feedback: strengthText });
   };
 
-  // Validate invite code
+  // Validate invite code via Edge Function to ensure server-side rules and consistent behavior
   const validateInviteCode = async (code: string) => {
     if (!code.trim()) {
       setInviteCodeValid(null);
@@ -82,16 +83,10 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
     }
 
     try {
-      const { data, error } = await supabase
-        .from('invite_codes')
-        .select('*')
-        .eq('code', code.trim())
-        .is('used_at', null)
-        .gte('expires_at', new Date().toISOString())
-        .single();
-
-      setInviteCodeValid(!error && !!data);
-    } catch {
+      const res = await apiClient.validateInviteCode(code.trim());
+      setInviteCodeValid(!!res?.valid);
+    } catch (err) {
+      console.error('Invite validation error:', err);
       setInviteCodeValid(false);
     }
   };

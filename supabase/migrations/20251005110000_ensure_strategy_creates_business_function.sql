@@ -189,7 +189,6 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Error in create_or_update_strategy_with_business: %', SQLERRM;
   END;
-END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.create_or_update_strategy_with_business(jsonb, jsonb, jsonb[]) TO authenticated;

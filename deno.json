@@ -1,0 +1,29 @@
+{
+  "lint": {
+    "include": ["supabase/functions/**/*"],
+    "exclude": [
+      "src",
+      "node_modules",
+      "tests",
+      "dist",
+      "build",
+      "out",
+      "scripts",
+      "public",
+      ".*",
+      "*.json",
+      "*.md",
+      "*.config.*",
+      "*.test.*",
+      "*.spec.*"
+    ],
+    "rules": {
+      "include": [
+        "no-import-prefix",
+        "no-explicit-any",
+        "no-unused-vars",
+        "prefer-const"
+      ]
+    }
+  }
+}

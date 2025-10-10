@@ -35,35 +35,44 @@ BEGIN
     DROP POLICY IF EXISTS "Users can view their own businesses" ON public.businesses;
     DROP POLICY IF EXISTS "Users can manage their own businesses" ON public.businesses;
 
-    -- Create new policies referencing strategies.business_id -> businesses.id
+  -- Create new policies referencing strategies.business_id -> businesses.id
+  IF to_regclass('public.strategies') IS NOT NULL THEN
+    -- Use EXECUTE so the SQL referencing public.strategies isn't parsed unless the table exists
+    EXECUTE $sql$
     CREATE POLICY "Users can view their own businesses"
     ON public.businesses
     FOR SELECT
     USING (
-        auth.uid() = user_id OR
-        EXISTS (
-            SELECT 1 FROM public.strategies s
-            WHERE s.business_id = businesses.id AND s.user_id = auth.uid()
-        )
+      auth.uid() = user_id OR
+      EXISTS (
+        SELECT 1 FROM public.strategies s
+        WHERE s.business_id = businesses.id AND s.user_id = auth.uid()
+      )
     );
+    $sql$;
 
+    EXECUTE $sql$
     CREATE POLICY "Users can manage their own businesses"
     ON public.businesses
     FOR ALL
     USING (
-        auth.uid() = user_id OR
-        EXISTS (
-            SELECT 1 FROM public.strategies s
-            WHERE s.business_id = businesses.id AND s.user_id = auth.uid()
-        )
+      auth.uid() = user_id OR
+      EXISTS (
+        SELECT 1 FROM public.strategies s
+        WHERE s.business_id = businesses.id AND s.user_id = auth.uid()
+      )
     )
     WITH CHECK (
-        auth.uid() = user_id OR
-        EXISTS (
-            SELECT 1 FROM public.strategies s
-            WHERE s.business_id = businesses.id AND s.user_id = auth.uid()
-        )
+      auth.uid() = user_id OR
+      EXISTS (
+        SELECT 1 FROM public.strategies s
+        WHERE s.business_id = businesses.id AND s.user_id = auth.uid()
+      )
     );
+    $sql$;
+  ELSE
+    RAISE NOTICE 'Skipping creation of businesses policies referencing public.strategies: public.strategies does not exist yet.';
+  END IF;
 END $$;
 
 -- Note: If you have other policies or functions referencing businesses.strategy_id, update them accordingly.

@@ -1,6 +1,9 @@
 # Supabase Edge Functions Architecture
 
-This directory contains the edge functions that implement the server-side business logic for the application. This architecture moves sensitive operations, validations, and database logic away from the frontend to improve security, performance, and maintainability.
+This directory contains the edge functions that implement the server-side
+business logic for the application. This architecture moves sensitive
+operations, validations, and database logic away from the frontend to improve
+security, performance, and maintainability.
 
 ## 🏗️ Architecture Overview
 
@@ -24,11 +27,14 @@ supabase/functions/
 
 ### Design Principles
 
-1. **Security First**: All sensitive operations happen server-side with proper authentication
+1. **Security First**: All sensitive operations happen server-side with proper
+   authentication
 2. **Input Validation**: Every input is validated using Zod schemas
 3. **Role-Based Access**: Fine-grained permissions based on user roles
-4. **Standardized Responses**: Consistent API response format across all functions
-5. **Error Handling**: Comprehensive error handling with proper HTTP status codes
+4. **Standardized Responses**: Consistent API response format across all
+   functions
+5. **Error Handling**: Comprehensive error handling with proper HTTP status
+   codes
 6. **Audit Logging**: All sensitive operations are logged for compliance
 
 ## 🔧 Shared Libraries
@@ -42,10 +48,10 @@ Handles JWT token validation and role-based access control:
 const user = await validateAuth(request);
 
 // Check if user has required role
-await requireRole(user, ['admin', 'super_admin']);
+await requireRole(user, ["admin", "super_admin"]);
 
 // Check if user can access specific resource
-await requireResourceAccess(user, 'user_profile', targetUserId);
+await requireResourceAccess(user, "user_profile", targetUserId);
 ```
 
 ### Validation (`_shared/validation.ts`)
@@ -69,7 +75,12 @@ Standardizes API responses:
 return successResponse(data, { pagination: { page: 1, total: 100 } });
 
 // Error response
-return errorResponse('VALIDATION_ERROR', 'Invalid input', 400, validationErrors);
+return errorResponse(
+  "VALIDATION_ERROR",
+  "Invalid input",
+  400,
+  validationErrors,
+);
 ```
 
 ## 🚀 Edge Functions
@@ -79,6 +90,7 @@ return errorResponse('VALIDATION_ERROR', 'Invalid input', 400, validationErrors)
 Handles user profiles, roles, and administrative operations:
 
 **Endpoints:**
+
 - `GET /user-management/me` - Get current user profile
 - `PATCH /user-management/me` - Update current user profile
 - `GET /user-management` - List users (admin only)
@@ -87,6 +99,7 @@ Handles user profiles, roles, and administrative operations:
 - `DELETE /user-management?userId=uuid` - Deactivate user (super admin only)
 
 **Features:**
+
 - Profile management with validation
 - Role-based access control
 - User search and filtering
@@ -98,6 +111,7 @@ Handles user profiles, roles, and administrative operations:
 Handles transactions, financial summaries, and OCR processing:
 
 **Endpoints:**
+
 - `GET /financial-management/transactions` - Get user transactions
 - `POST /financial-management/transactions` - Create transaction
 - `PATCH /financial-management/transactions/:id` - Update transaction
@@ -107,6 +121,7 @@ Handles transactions, financial summaries, and OCR processing:
 - `GET /financial-management/ocr` - Get OCR jobs
 
 **Features:**
+
 - Transaction CRUD with validation
 - Server-side financial calculations
 - Multi-currency support
@@ -116,60 +131,91 @@ Handles transactions, financial summaries, and OCR processing:
 
 ### Invite Codes (`invite-codes/`)
 
-Implements the invite code system for organizations (hubs) inviting entrepreneurs and super admins inviting organizations.
+Implements the invite code system for organizations (hubs) inviting
+entrepreneurs and super admins inviting organizations.
 
 **Endpoints:**
-- `POST /invite-codes` - Create an invite code (admin/hub_manager; super_admin can create organization invites)
+
+- `POST /invite-codes` - Create an invite code (admin/hub_manager; super_admin
+  can create organization invites)
 - `GET /invite-codes/validate?code=...` - Validate an invite code (public)
-- `POST /invite-codes/consume` - Consume an invite code after signup; links hub association when applicable
+- `POST /invite-codes/consume` - Consume an invite code after signup; links hub
+  association when applicable
 - `GET /invite-codes/health` - Health check
 
 **Features:**
-- RBAC enforced: hub managers/admins can create entrepreneur invites only; super admins can create both
+
+- RBAC enforced: hub managers/admins can create entrepreneur invites only; super
+  admins can create both
 - Invite validation with expiry and single-use enforcement
-- On consumption: if invite originated from an organization/hub, the user is linked to that hub as entrepreneur. If subscription tables exist, the function also auto-assigns the Premium plan using a service-role client (idempotent). The response includes assigned_plan and subscription_assigned flags.
+- On consumption: if invite originated from an organization/hub, the user is
+  linked to that hub as entrepreneur. If subscription tables exist, the function
+  also auto-assigns the Premium plan using a service-role client (idempotent).
+  The response includes assigned_plan and subscription_assigned flags.
 - Standardized responses, input validation (Zod), and CORS handling
 
 ### Subscriptions (`subscriptions/`)
 
-REST API for managing subscription plans and user subscriptions. Note: Requires DB tables `subscription_plans` and `user_subscriptions`.
+REST API for managing subscription plans and user subscriptions. Note: Requires
+DB tables `subscription_plans` and `user_subscriptions`.
 
 **Plan Endpoints:**
+
 - `GET /subscriptions/plans` - List active plans (public)
 - `POST /subscriptions/plans` - Create a plan (super_admin only)
 - `PATCH /subscriptions/plans?id=UUID` - Update a plan (super_admin only)
-- `DELETE /subscriptions/plans?id=UUID` - Soft-delete (deactivate) a plan (super_admin only)
+- `DELETE /subscriptions/plans?id=UUID` - Soft-delete (deactivate) a plan
+  (super_admin only)
 
 **User Subscription Endpoints:**
+
 - `POST /subscriptions/assign` - Assign a plan to a user (admin/super_admin)
 - `GET /subscriptions/me` - Get current user’s active subscription
 
 **Payment:**
-- `POST /subscriptions/paystack/initiate` - Initialize a Paystack transaction for the authenticated user. Body: `{ plan_id: UUID, callback_url?: string }`. Returns `{ authorization_url, access_code, reference }`.
-- `POST /subscriptions/paystack/webhook` - Paystack webhook endpoint. Verifies signature and, on `charge.success`, activates a user subscription using `metadata.user_id` and `metadata.plan_id`.
+
+- `POST /subscriptions/paystack/initiate` - Initialize a Paystack transaction
+  for the authenticated user. Body: `{ plan_id: UUID, callback_url?: string }`.
+  Returns `{ authorization_url, access_code, reference }`.
+- `POST /subscriptions/paystack/webhook` - Paystack webhook endpoint. Verifies
+  signature and, on `charge.success`, activates a user subscription using
+  `metadata.user_id` and `metadata.plan_id`.
 
 **Notes:**
+
 - Endpoints return clear errors if the required tables are not yet present.
-- Plan management is restricted to super admins initially to keep governance tight.
-- Period handling is naive for now; real billing periods will be updated via Paystack webhooks later.
+- Plan management is restricted to super admins initially to keep governance
+  tight.
+- Period handling is naive for now; real billing periods will be updated via
+  Paystack webhooks later.
 
 ### Business Templates (`business-templates/`)
+
 Provides CRUD for business templates used to drive dynamic forms and workflows.
 
 **Endpoints:**
-- `GET /business-templates` - List active templates (public). Optional query: `?tier=free|pro|premium` to filter by subscription tier via `template_permissions`.
+
+- `GET /business-templates` - List active templates (public). Optional query:
+  `?tier=free|pro|premium` to filter by subscription tier via
+  `template_permissions`.
 - `POST /business-templates` - Create template (super admin only)
 - `PATCH /business-templates?id=UUID` - Update template (super admin only)
-- `DELETE /business-templates?id=UUID` - Soft-delete (deactivate) template (super admin only)
+- `DELETE /business-templates?id=UUID` - Soft-delete (deactivate) template
+  (super admin only)
 - `GET /business-templates/health` - Health check
 
 **Notes:**
-- Templates include: `name`, `description`, `category`, `template_config` (JSON), `version`, `is_active`.
+
+- Templates include: `name`, `description`, `category`, `template_config`
+  (JSON), `version`, `is_active`.
 - Public listing is limited to `is_active=true` templates.
-- Permissions: `template_permissions` table maps templates to tiers. During development, if no permissions are defined, all active templates are returned; otherwise filtering by `tier` is applied.
+- Permissions: `template_permissions` table maps templates to tiers. During
+  development, if no permissions are defined, all active templates are returned;
+  otherwise filtering by `tier` is applied.
 - Migrations:
   - `20250929_03_business_templates.sql` creates `business_templates` with RLS.
-  - `20250929_04_template_permissions.sql` creates `template_permissions` with RLS.
+  - `20250929_04_template_permissions.sql` creates `template_permissions` with
+    RLS.
 
 ## 🔒 Security Features
 
@@ -250,6 +296,7 @@ npm run test:health -- --env=production
 ### Automated Deployment
 
 GitHub Actions automatically:
+
 1. Runs linting and type checking
 2. Performs security scans with Semgrep
 3. Runs integration tests locally
@@ -374,14 +421,17 @@ curl -X GET \
 
 ---
 
-For questions or issues, check the function logs in the Supabase Dashboard or run local tests to debug problems.
+For questions or issues, check the function logs in the Supabase Dashboard or
+run local tests to debug problems.
 
 ## 📦 Default Subscription Plans
 
 A migration seeds default plans (idempotent): Free, Pro, and Premium.
 
-- Migration file: supabase/migrations/20250929_02_seed_default_subscription_plans.sql
+- Migration file:
+  supabase/migrations/20250929_02_seed_default_subscription_plans.sql
 - Uniqueness is enforced on lower(name) to avoid duplicates across environments.
-- Features JSON is permissive during development: all entrepreneur features enabled; limits included for guidance only.
+- Features JSON is permissive during development: all entrepreneur features
+  enabled; limits included for guidance only.
 
 You can list active plans via GET /subscriptions/plans after running migrations.

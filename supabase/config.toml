@@ -13,3 +13,5 @@ verify_jwt = false
 
 [functions.send-signup-confirmation]
 verify_jwt = false
+[functions.send-invite-confirmation]
+verify_jwt = false

@@ -30,9 +30,20 @@ DO $$ BEGIN
     END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_analytics_summaries_metric_date ON public.analytics_summaries (metric_type, metric_date);
-CREATE INDEX IF NOT EXISTS idx_business_progress_stages_stage ON public.business_progress_stages (stage_name);
-CREATE INDEX IF NOT EXISTS idx_business_progress_stages_user_id ON public.business_progress_stages (user_id);
-CREATE INDEX IF NOT EXISTS idx_financial_transactions_date ON public.financial_transactions (transaction_date DESC);
-CREATE INDEX IF NOT EXISTS idx_financial_transactions_user_id ON public.financial_transactions (user_id);
-CREATE INDEX IF NOT EXISTS idx_user_activities_user_id ON public.user_activities (user_id);
+DO $$
+BEGIN
+    IF to_regclass('public.analytics_summaries') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_analytics_summaries_metric_date ON public.analytics_summaries (metric_type, metric_date);
+    END IF;
+    IF to_regclass('public.business_progress_stages') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_business_progress_stages_stage ON public.business_progress_stages (stage_name);
+        CREATE INDEX IF NOT EXISTS idx_business_progress_stages_user_id ON public.business_progress_stages (user_id);
+    END IF;
+    IF to_regclass('public.financial_transactions') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_financial_transactions_date ON public.financial_transactions (transaction_date DESC);
+        CREATE INDEX IF NOT EXISTS idx_financial_transactions_user_id ON public.financial_transactions (user_id);
+    END IF;
+    IF to_regclass('public.user_activities') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS idx_user_activities_user_id ON public.user_activities (user_id);
+    END IF;
+END$$;

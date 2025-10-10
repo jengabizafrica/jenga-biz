@@ -33,40 +33,42 @@ class Environment {
 
   private loadConfig(): EnvironmentConfig {
     const requiredVars = {
-      supabaseUrl: Deno.env.get('SUPABASE_URL'),
-      supabaseAnonKey: Deno.env.get('SUPABASE_ANON_KEY'),
-      supabaseServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      supabaseUrl: Deno.env.get("SUPABASE_URL"),
+      supabaseAnonKey: Deno.env.get("SUPABASE_ANON_KEY"),
+      supabaseServiceRoleKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
     };
 
     // Validate required environment variables
     for (const [key, value] of Object.entries(requiredVars)) {
       if (!value) {
-        throw new Error(`Missing required environment variable: ${key.toUpperCase()}`);
+        throw new Error(
+          `Missing required environment variable: ${key.toUpperCase()}`,
+        );
       }
     }
 
     const config: EnvironmentConfig = {
       ...requiredVars as Required<typeof requiredVars>,
-      resendApiKey: Deno.env.get('RESEND_API_KEY'),
+      resendApiKey: Deno.env.get("RESEND_API_KEY"),
     };
 
     // Optional Paystack config
-    const paystackSecret = Deno.env.get('PAYSTACK_SECRET_KEY');
+    const paystackSecret = Deno.env.get("PAYSTACK_SECRET_KEY");
     if (paystackSecret) {
       config.paystack = {
         secretKey: paystackSecret,
-        publicKey: Deno.env.get('PAYSTACK_PUBLIC_KEY') || undefined,
-        baseUrl: Deno.env.get('PAYSTACK_BASE_URL') || 'https://api.paystack.co'
+        publicKey: Deno.env.get("PAYSTACK_PUBLIC_KEY") || undefined,
+        baseUrl: Deno.env.get("PAYSTACK_BASE_URL") || "https://api.paystack.co",
       };
     }
 
     // Optional rate limiting config
-    const redisUrl = Deno.env.get('UPSTASH_REDIS_REST_URL');
-    const redisToken = Deno.env.get('UPSTASH_REDIS_REST_TOKEN');
-    
+    const redisUrl = Deno.env.get("UPSTASH_REDIS_REST_URL");
+    const redisToken = Deno.env.get("UPSTASH_REDIS_REST_TOKEN");
+
     if (redisUrl && redisToken) {
       config.rateLimit = {
-        redis: { url: redisUrl, token: redisToken }
+        redis: { url: redisUrl, token: redisToken },
       };
     }
 

@@ -23,6 +23,26 @@ END$$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'financial_records') THEN
+    -- Ensure the target table exists and has the required columns before attempting the INSERT.
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'financial_transactions') THEN
+      RAISE NOTICE 'Skipping financial_records -> financial_transactions: target table public.financial_transactions does not exist.';
+      RETURN;
+    END IF;
+
+    DECLARE
+      req_count int;
+    BEGIN
+      SELECT COUNT(*) INTO req_count
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'financial_transactions'
+        AND column_name IN ('id','user_id','strategy_id','amount','category','description','currency','transaction_date','created_at','updated_at');
+
+      IF req_count <> 10 THEN
+        RAISE NOTICE 'Skipping financial_records -> financial_transactions: target table missing required columns (found % of 10).', req_count;
+        RETURN;
+      END IF;
+    END;
+
     INSERT INTO public.financial_transactions (id, user_id, strategy_id, amount, category, description, currency, transaction_date, created_at, updated_at)
     SELECT fr.id, NULL::uuid, fr.strategy_id, COALESCE(fr.revenue,0) - COALESCE(fr.expenses,0) AS amount,
            CASE WHEN COALESCE(fr.revenue,0) - COALESCE(fr.expenses,0) >= 0 THEN 'revenue' ELSE 'expense' END AS category,
@@ -50,9 +70,20 @@ BEGIN
 END$$;
 
 -- 5) Rebuild any dependent RLS policies / indexes if needed (no-op if not present)
-CREATE INDEX IF NOT EXISTS idx_milestones_strategy_id ON public.milestones(strategy_id);
-CREATE INDEX IF NOT EXISTS idx_financial_transactions_strategy_id ON public.financial_transactions(strategy_id);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'milestones') THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_milestones_strategy_id ON public.milestones(strategy_id)';
+  ELSE
+    RAISE NOTICE 'Skipping index creation on public.milestones: table does not exist.';
+  END IF;
 
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'financial_transactions') THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_financial_transactions_strategy_id ON public.financial_transactions(strategy_id)';
+  ELSE
+    RAISE NOTICE 'Skipping index creation on public.financial_transactions: table does not exist.';
+  END IF;
+END$$;
 COMMIT;
 
 -- Note: This migration intentionally avoids destructive drops if legacy tables contain data. Review the tables and run another migration to drop them after verification.
