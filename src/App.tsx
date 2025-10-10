@@ -25,7 +25,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { AdminDashboard } from "./components/dashboard/AdminDashboard";
 import HubAdminDashboard from './components/dashboard/HubAdminDashboard';
 import { ServiceWorkerUpdater } from "./components/ServiceWorkerUpdater";
-import { Analytics } from '@vercel/analytics/next';
+import { Analytics } from '@vercel/analytics/react';
 import {SpeedInsights} from '@vercel/speed-insights/react';
 
 
