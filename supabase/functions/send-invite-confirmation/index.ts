@@ -10,7 +10,8 @@ declare const Deno: {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface InviteEmailRequest {
@@ -24,88 +25,154 @@ interface InviteEmailRequest {
 
 function maskKey(k?: string | undefined) {
   if (!k) return null;
-  try { return `${k.slice(0,4)}...(${k.length})`; } catch { return '***'; }
+  try {
+    return `${k.slice(0, 4)}...(${k.length})`;
+  } catch {
+    return "***";
+  }
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   // Simple health check endpoint to validate env presence without attempting sends
-  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
-    const brevoEnv = Deno.env.get('BREVO_API_KEY');
-    const sender = Deno.env.get('BREVO_SENDER_EMAIL') || 'unset';
-    return new Response(JSON.stringify({ ok: true, brevo_present: !!brevoEnv, brevo_masked: maskKey(brevoEnv) || null, sender }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  if (req.method === "GET" && new URL(req.url).pathname.endsWith("/health")) {
+    const brevoEnv = Deno.env.get("BREVO_API_KEY");
+    const sender = Deno.env.get("BREVO_SENDER_EMAIL") || "unset";
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        brevo_present: !!brevoEnv,
+        brevo_masked: maskKey(brevoEnv) || null,
+        sender,
+      }),
+      { headers: { "Content-Type": "application/json", ...corsHeaders } },
+    );
   }
 
   try {
     const body: InviteEmailRequest = await req.json();
 
-    const isDev = (Deno.env.get('ENV') === 'development') || (Deno.env.get('DEV') === 'true');
+    const isDev = (Deno.env.get("ENV") === "development") ||
+      (Deno.env.get("DEV") === "true");
     if (isDev) {
       try {
-        console.log('send-invite-confirmation - incoming payload:', JSON.stringify(body));
+        console.log(
+          "send-invite-confirmation - incoming payload:",
+          JSON.stringify(body),
+        );
       } catch {
-        console.log('send-invite-confirmation - incoming payload (unserializable)');
+        console.log(
+          "send-invite-confirmation - incoming payload (unserializable)",
+        );
       }
     }
 
     if (!body.inviteCode) {
-      return new Response(JSON.stringify({ success: false, error: 'missing_invite_code', message: 'inviteCode is required for invite emails' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "missing_invite_code",
+          message: "inviteCode is required for invite emails",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     }
 
     const email = body.email;
-    let confirmationUrl = body.confirmationUrl || '';
+    let confirmationUrl = body.confirmationUrl || "";
     if (!confirmationUrl) {
       // Fallback: try to build a registration link from known env vars or default to root /register
-      const confirmationBase = Deno.env.get('SITE_CONFIRMATION_URL') || Deno.env.get('VITE_REDIRECT_URL') || Deno.env.get('SITE_URL') || Deno.env.get('VITE_SITE_URL') || '';
+      const confirmationBase = Deno.env.get("SITE_CONFIRMATION_URL") ||
+        Deno.env.get("VITE_REDIRECT_URL") || Deno.env.get("SITE_URL") ||
+        Deno.env.get("VITE_SITE_URL") || "";
       if (confirmationBase) {
-        const base = confirmationBase.replace(/\/$/, '');
+        const base = confirmationBase.replace(/\/$/, "");
         const params = new URLSearchParams();
-  params.set('invite_code', body.inviteCode);
-  if (body.email) params.set('email', body.email);
+        params.set("invite_code", body.inviteCode);
+        if (body.email) params.set("email", body.email);
         confirmationUrl = `${base}?${params.toString()}`;
       } else {
         // default to app /register path
-        const appOrigin = Deno.env.get('SITE_URL') || '';
+        const appOrigin = Deno.env.get("SITE_URL") || "";
         const params = new URLSearchParams();
-  params.set('invite_code', body.inviteCode);
-  if (body.email) params.set('email', body.email);
-        confirmationUrl = appOrigin ? `${appOrigin.replace(/\/$/, '')}/register?${params.toString()}` : `/register?${params.toString()}`;
+        params.set("invite_code", body.inviteCode);
+        if (body.email) params.set("email", body.email);
+        confirmationUrl = appOrigin
+          ? `${appOrigin.replace(/\/$/, "")}/register?${params.toString()}`
+          : `/register?${params.toString()}`;
       }
     }
 
     function maskKey(k?: string | undefined) {
       if (!k) return null;
-      try { return `${k.slice(0,4)}...(${k.length})`; } catch { return '***'; }
+      try {
+        return `${k.slice(0, 4)}...(${k.length})`;
+      } catch {
+        return "***";
+      }
     }
 
-    const brevoEnv = Deno.env.get('BREVO_API_KEY');
-    const brevoVite = Deno.env.get('VITE_BREVO_API_KEY');
+    const brevoEnv = Deno.env.get("BREVO_API_KEY");
+    const brevoVite = Deno.env.get("VITE_BREVO_API_KEY");
     let brevoKey = brevoEnv || brevoVite;
 
     if (!brevoKey && isDev) {
-      const hdr = req.headers.get('x-brevo-api-key') || req.headers.get('x-debug-brevo-key') || undefined;
+      const hdr = req.headers.get("x-brevo-api-key") ||
+        req.headers.get("x-debug-brevo-key") || undefined;
       if (hdr) {
-        console.warn('send-invite-confirmation: using BREVO API key from request header (development only)');
+        console.warn(
+          "send-invite-confirmation: using BREVO API key from request header (development only)",
+        );
         brevoKey = hdr;
       }
     }
 
-    console.debug('send-invite-confirmation: brevoKey present=', !!brevoKey, 'sources=', { BREVO_API_KEY: !!brevoEnv, VITE_BREVO_API_KEY: !!brevoVite }, 'masked=', maskKey(brevoKey));
+    console.debug(
+      "send-invite-confirmation: brevoKey present=",
+      !!brevoKey,
+      "sources=",
+      { BREVO_API_KEY: !!brevoEnv, VITE_BREVO_API_KEY: !!brevoVite },
+      "masked=",
+      maskKey(brevoKey),
+    );
 
     if (!brevoKey) {
       try {
         await new Promise((resolve) => setTimeout(resolve, 200));
-        brevoKey = Deno.env.get('BREVO_API_KEY') || Deno.env.get('VITE_BREVO_API_KEY');
-        console.debug('send-invite-confirmation: retry read brevoKey present=', !!brevoKey, 'masked=', maskKey(brevoKey));
+        brevoKey = Deno.env.get("BREVO_API_KEY") ||
+          Deno.env.get("VITE_BREVO_API_KEY");
+        console.debug(
+          "send-invite-confirmation: retry read brevoKey present=",
+          !!brevoKey,
+          "masked=",
+          maskKey(brevoKey),
+        );
       } catch {
         // ignore
       }
     }
 
     if (!brevoKey) {
-      console.error('BREVO_API_KEY is not configured for send-invite-confirmation');
-      return new Response(JSON.stringify({ success: false, error: 'brevo_not_configured', message: 'BREVO_API_KEY must be set in the function environment' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      console.error(
+        "BREVO_API_KEY is not configured for send-invite-confirmation",
+      );
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "brevo_not_configured",
+          message: "BREVO_API_KEY must be set in the function environment",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     }
 
     // Render invite template (invite-specific)
@@ -134,54 +201,101 @@ const handler = async (req: Request): Promise<Response> => {
   </body>
 </html>`;
 
-    const renderedText = `You have been invited\n\nInvite code: ${inviteCode}\n\nAccept the invite: ${confirmationUrl}\n`;
+    const renderedText =
+      `You have been invited\n\nInvite code: ${inviteCode}\n\nAccept the invite: ${confirmationUrl}\n`;
 
-    const envSender = Deno.env.get('BREVO_SENDER_EMAIL');
-    const defaultSender = 'jengabizafrica@gmail.com';
+    const envSender = Deno.env.get("BREVO_SENDER_EMAIL");
+    const defaultSender = "jengabizafrica@gmail.com";
     let senderEmail = envSender || defaultSender;
 
     if (isDev) {
-      const hdrSender = req.headers.get('x-sender-email') || undefined;
+      const hdrSender = req.headers.get("x-sender-email") || undefined;
       if (hdrSender) senderEmail = hdrSender;
       if ((body as any).senderEmail) senderEmail = (body as any).senderEmail;
     }
 
-  console.debug('send-invite-confirmation: using sender=', senderEmail);
-  console.debug('send-invite-confirmation: confirmationUrl=', confirmationUrl, 'to=', email, 'inviteCode=', inviteCode);
+    console.debug("send-invite-confirmation: using sender=", senderEmail);
+    console.debug(
+      "send-invite-confirmation: confirmationUrl=",
+      confirmationUrl,
+      "to=",
+      email,
+      "inviteCode=",
+      inviteCode,
+    );
 
     try {
       const brevoPayload = {
-        sender: { name: 'Jenga Biz Africa', email: senderEmail },
+        sender: { name: "Jenga Biz Africa", email: senderEmail },
         to: [{ email }],
-        subject: body.subject || `You were invited to join ${Deno.env.get('SITE_NAME') || 'Jenga Biz'}`,
+        subject: body.subject ||
+          `You were invited to join ${
+            Deno.env.get("SITE_NAME") || "Jenga Biz"
+          }`,
         htmlContent: renderedHtml,
         textContent: renderedText,
       };
 
-      const brevoResp = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
+      const brevoResp = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'api-key': brevoKey,
+          "Content-Type": "application/json",
+          "api-key": brevoKey,
         },
         body: JSON.stringify(brevoPayload),
       });
 
       const brevoBody = await brevoResp.json().catch(() => null);
       if (!brevoResp.ok) {
-        console.error('Brevo send failed (invite):', brevoResp.status, brevoBody);
-        return new Response(JSON.stringify({ success: false, provider: 'brevo', status: brevoResp.status, details: brevoBody }), { status: 502, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+        console.error(
+          "Brevo send failed (invite):",
+          brevoResp.status,
+          brevoBody,
+        );
+        return new Response(
+          JSON.stringify({
+            success: false,
+            provider: "brevo",
+            status: brevoResp.status,
+            details: brevoBody,
+          }),
+          {
+            status: 502,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          },
+        );
       }
 
-      console.log('Brevo send-success (invite):', brevoBody);
-      return new Response(JSON.stringify({ success: true, provider: 'brevo', data: brevoBody }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      console.log("Brevo send-success (invite):", brevoBody);
+      return new Response(
+        JSON.stringify({ success: true, provider: "brevo", data: brevoBody }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     } catch (e: any) {
-      console.error('Brevo send error (invite):', e);
-      return new Response(JSON.stringify({ success: false, provider: 'brevo', error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      console.error("Brevo send error (invite):", e);
+      return new Response(
+        JSON.stringify({ success: false, provider: "brevo", error: String(e) }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     }
   } catch (error: any) {
-    console.error('Error sending invite email:', error);
-    return new Response(JSON.stringify({ error: error?.message || String(error), details: error?.response?.body || null }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    console.error("Error sending invite email:", error);
+    return new Response(
+      JSON.stringify({
+        error: error?.message || String(error),
+        details: error?.response?.body || null,
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      },
+    );
   }
 };
 

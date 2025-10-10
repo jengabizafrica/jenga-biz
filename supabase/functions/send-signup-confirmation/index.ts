@@ -13,7 +13,8 @@ declare const Deno: {
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface SignupEmailRequest {
@@ -34,19 +35,27 @@ const handler = async (req: Request): Promise<Response> => {
     const body: SignupEmailRequest = await req.json();
 
     // Log full payload in development to help debugging (best-effort)
-    const isDev = (Deno.env.get('ENV') === 'development') || (Deno.env.get('DEV') === 'true');
+    const isDev = (Deno.env.get("ENV") === "development") ||
+      (Deno.env.get("DEV") === "true");
     if (isDev) {
       try {
-        console.log('send-signup-confirmation - incoming payload:', JSON.stringify(body));
+        console.log(
+          "send-signup-confirmation - incoming payload:",
+          JSON.stringify(body),
+        );
       } catch (e) {
-        console.log('send-signup-confirmation - incoming payload (unserializable)');
+        console.log(
+          "send-signup-confirmation - incoming payload (unserializable)",
+        );
       }
     }
 
     const email = body.email;
-    const confirmationUrl = body.confirmationUrl || '';
-    const subject = body.subject || 'Welcome to Jenga Biz Africa - Confirm Your Email';
-    const text = body.text || `Please confirm your email by visiting: ${confirmationUrl}`;
+    const confirmationUrl = body.confirmationUrl || "";
+    const subject = body.subject ||
+      "Welcome to Jenga Biz Africa - Confirm Your Email";
+    const text = body.text ||
+      `Please confirm your email by visiting: ${confirmationUrl}`;
     const html = body.html || `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background-color: #f97316; padding: 8px 20px 14px 20px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -97,103 +106,168 @@ const handler = async (req: Request): Promise<Response> => {
     // Add defensive logging and a dev-only header override to help diagnose intermittent missing-secret errors.
     function maskKey(k?: string | undefined) {
       if (!k) return null;
-      try { return `${k.slice(0,4)}...(${k.length})`; } catch { return '***'; }
+      try {
+        return `${k.slice(0, 4)}...(${k.length})`;
+      } catch {
+        return "***";
+      }
     }
 
     // Health endpoint (GET /health) to surface masked env presence without sending mail
-    if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
-      const brevoEnv = Deno.env.get('BREVO_API_KEY');
-      const sender = Deno.env.get('BREVO_SENDER_EMAIL') || 'unset';
-      return new Response(JSON.stringify({ ok: true, brevo_present: !!brevoEnv, brevo_masked: maskKey(brevoEnv) || null, sender }), { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    if (req.method === "GET" && new URL(req.url).pathname.endsWith("/health")) {
+      const brevoEnv = Deno.env.get("BREVO_API_KEY");
+      const sender = Deno.env.get("BREVO_SENDER_EMAIL") || "unset";
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          brevo_present: !!brevoEnv,
+          brevo_masked: maskKey(brevoEnv) || null,
+          sender,
+        }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
     }
 
-    const brevoEnv = Deno.env.get('BREVO_API_KEY');
-    const brevoVite = Deno.env.get('VITE_BREVO_API_KEY');
+    const brevoEnv = Deno.env.get("BREVO_API_KEY");
+    const brevoVite = Deno.env.get("VITE_BREVO_API_KEY");
     let brevoKey = brevoEnv || brevoVite;
 
     // In development ONLY, allow an override from a request header to help debug deployed functions locally.
     if (!brevoKey && isDev) {
-      const hdr = req.headers.get('x-brevo-api-key') || req.headers.get('x-debug-brevo-key') || undefined;
+      const hdr = req.headers.get("x-brevo-api-key") ||
+        req.headers.get("x-debug-brevo-key") || undefined;
       if (hdr) {
-        console.warn('send-signup-confirmation: using BREVO API key from request header (development only)');
+        console.warn(
+          "send-signup-confirmation: using BREVO API key from request header (development only)",
+        );
         brevoKey = hdr;
       }
     }
 
-    console.debug('send-signup-confirmation: brevoKey present=', !!brevoKey, 'sources=', { BREVO_API_KEY: !!brevoEnv, VITE_BREVO_API_KEY: !!brevoVite }, 'masked=', maskKey(brevoKey));
+    console.debug(
+      "send-signup-confirmation: brevoKey present=",
+      !!brevoKey,
+      "sources=",
+      { BREVO_API_KEY: !!brevoEnv, VITE_BREVO_API_KEY: !!brevoVite },
+      "masked=",
+      maskKey(brevoKey),
+    );
 
     // Quick retry: attempt to re-read env once after a short delay in case of transient env propagation
     if (!brevoKey) {
       try {
         await new Promise((resolve) => setTimeout(resolve, 200));
-        brevoKey = Deno.env.get('BREVO_API_KEY') || Deno.env.get('VITE_BREVO_API_KEY');
-        console.debug('send-signup-confirmation: retry read brevoKey present=', !!brevoKey, 'masked=', maskKey(brevoKey));
+        brevoKey = Deno.env.get("BREVO_API_KEY") ||
+          Deno.env.get("VITE_BREVO_API_KEY");
+        console.debug(
+          "send-signup-confirmation: retry read brevoKey present=",
+          !!brevoKey,
+          "masked=",
+          maskKey(brevoKey),
+        );
       } catch (e) {
         // ignore
       }
     }
 
     if (!brevoKey) {
-      console.error('BREVO_API_KEY is not configured for send-signup-confirmation');
-      return new Response(JSON.stringify({ success: false, error: 'brevo_not_configured', message: 'BREVO_API_KEY must be set in the function environment' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      console.error(
+        "BREVO_API_KEY is not configured for send-signup-confirmation",
+      );
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "brevo_not_configured",
+          message: "BREVO_API_KEY must be set in the function environment",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     }
 
     // This function is strictly for self-registration confirmation emails.
     // Invite-specific emails are handled by `send-invite-confirmation`.
     const inviteCode = (body as any).inviteCode as string | undefined;
     if (inviteCode) {
-      console.warn('send-signup-confirmation invoked with inviteCode; invite sends should use send-invite-confirmation. Ignoring inviteCode and sending confirmation template.');
+      console.warn(
+        "send-signup-confirmation invoked with inviteCode; invite sends should use send-invite-confirmation. Ignoring inviteCode and sending confirmation template.",
+      );
     }
     const renderedHtml = html;
     const renderedText = text;
 
     // Determine sender email (env override preferred). In production this must be a verified sender in Brevo.
-    const envSender = Deno.env.get('BREVO_SENDER_EMAIL');
-    const defaultSender = 'jengabizafrica@gmail.com';
+    const envSender = Deno.env.get("BREVO_SENDER_EMAIL");
+    const defaultSender = "jengabizafrica@gmail.com";
     let senderEmail = envSender || defaultSender;
 
     // Allow a dev-only override via request header or body for testing
     if (isDev) {
-      const hdrSender = req.headers.get('x-sender-email') || undefined;
+      const hdrSender = req.headers.get("x-sender-email") || undefined;
       if (hdrSender) senderEmail = hdrSender;
       if ((body as any).senderEmail) senderEmail = (body as any).senderEmail;
     }
 
-    console.debug('send-signup-confirmation: using sender=', senderEmail);
+    console.debug("send-signup-confirmation: using sender=", senderEmail);
 
     // Send via Brevo
     try {
       const brevoPayload = {
-        sender: { name: 'Jenga Biz Africa', email: senderEmail },
+        sender: { name: "Jenga Biz Africa", email: senderEmail },
         to: [{ email }],
         subject,
         htmlContent: renderedHtml,
         textContent: renderedText,
       };
 
-      const brevoResp = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
+      const brevoResp = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'api-key': brevoKey,
+          "Content-Type": "application/json",
+          "api-key": brevoKey,
         },
         body: JSON.stringify(brevoPayload),
       });
 
       const brevoBody = await brevoResp.json().catch(() => null);
       if (!brevoResp.ok) {
-        console.error('Brevo send failed:', brevoResp.status, brevoBody);
-        return new Response(JSON.stringify({ success: false, provider: 'brevo', status: brevoResp.status, details: brevoBody }), { status: 502, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+        console.error("Brevo send failed:", brevoResp.status, brevoBody);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            provider: "brevo",
+            status: brevoResp.status,
+            details: brevoBody,
+          }),
+          {
+            status: 502,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          },
+        );
       }
 
-      console.log('Brevo send-success:', brevoBody);
-      return new Response(JSON.stringify({ success: true, provider: 'brevo', data: brevoBody }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      console.log("Brevo send-success:", brevoBody);
+      return new Response(
+        JSON.stringify({ success: true, provider: "brevo", data: brevoBody }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     } catch (e: any) {
-      console.error('Brevo send error:', e);
-      return new Response(JSON.stringify({ success: false, provider: 'brevo', error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      console.error("Brevo send error:", e);
+      return new Response(
+        JSON.stringify({ success: false, provider: "brevo", error: String(e) }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        },
+      );
     }
   } catch (error: any) {
-    console.error('Error sending signup confirmation email:', error);
+    console.error("Error sending signup confirmation email:", error);
     return new Response(
       JSON.stringify({
         error: error?.message || String(error),
@@ -201,8 +275,8 @@ const handler = async (req: Request): Promise<Response> => {
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      },
     );
   }
 };

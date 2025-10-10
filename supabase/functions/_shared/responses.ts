@@ -3,14 +3,15 @@
  * Ensures consistent API response format across all edge functions
  */
 
-import { AuthError } from './auth.ts';
-import { ValidationError } from './validation.ts';
+import { AuthError } from "./auth.ts";
+import { ValidationError } from "./validation.ts";
 
 // Standard CORS headers
 export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 };
 
 // Response envelope interfaces
@@ -52,7 +53,7 @@ export function handleCors(): Response {
 export function successResponse<T>(
   data: T,
   status: number = 200,
-  meta?: SuccessResponse<T>['meta']
+  meta?: SuccessResponse<T>["meta"],
 ): Response {
   const response: SuccessResponse<T> = {
     success: true,
@@ -63,7 +64,7 @@ export function successResponse<T>(
   return new Response(JSON.stringify(response), {
     status,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...corsHeaders,
     },
   });
@@ -76,7 +77,7 @@ export function errorResponse(
   code: string,
   message: string,
   status: number = 400,
-  details?: any
+  details?: any,
 ): Response {
   const response: ErrorResponse = {
     success: false,
@@ -90,7 +91,7 @@ export function errorResponse(
   return new Response(JSON.stringify(response), {
     status,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...corsHeaders,
     },
   });
@@ -100,54 +101,54 @@ export function errorResponse(
  * Handle known errors and convert to appropriate responses
  */
 export function handleError(error: unknown): Response {
-  console.error('Function error:', error);
+  console.error("Function error:", error);
 
   if (error instanceof AuthError) {
     return errorResponse(
-      'AUTH_ERROR',
+      "AUTH_ERROR",
       error.message,
-      error.status
+      error.status,
     );
   }
 
   if (error instanceof ValidationError) {
     return errorResponse(
-      'VALIDATION_ERROR',
+      "VALIDATION_ERROR",
       error.message,
       400,
-      error.errors
+      error.errors,
     );
   }
 
   // Database errors
-  if (error && typeof error === 'object' && 'code' in error) {
+  if (error && typeof error === "object" && "code" in error) {
     const dbError = error as any;
-    
+
     // Handle common PostgreSQL errors
     switch (dbError.code) {
-      case '23505': // unique_violation
+      case "23505": // unique_violation
         return errorResponse(
-          'DUPLICATE_RECORD',
-          'A record with this information already exists',
-          409
+          "DUPLICATE_RECORD",
+          "A record with this information already exists",
+          409,
         );
-      case '23503': // foreign_key_violation
+      case "23503": // foreign_key_violation
         return errorResponse(
-          'INVALID_REFERENCE',
-          'Referenced record does not exist',
-          400
+          "INVALID_REFERENCE",
+          "Referenced record does not exist",
+          400,
         );
-      case '23502': // not_null_violation
+      case "23502": // not_null_violation
         return errorResponse(
-          'MISSING_REQUIRED_FIELD',
-          'Required field is missing',
-          400
+          "MISSING_REQUIRED_FIELD",
+          "Required field is missing",
+          400,
         );
-      case '42501': // insufficient_privilege
+      case "42501": // insufficient_privilege
         return errorResponse(
-          'INSUFFICIENT_PRIVILEGES',
-          'You do not have permission to perform this action',
-          403
+          "INSUFFICIENT_PRIVILEGES",
+          "You do not have permission to perform this action",
+          403,
         );
       default:
         break;
@@ -156,9 +157,9 @@ export function handleError(error: unknown): Response {
 
   // Generic server error
   return errorResponse(
-    'INTERNAL_ERROR',
-    'An unexpected error occurred',
-    500
+    "INTERNAL_ERROR",
+    "An unexpected error occurred",
+    500,
   );
 }
 
@@ -171,7 +172,7 @@ export function paginatedResponse<T>(
     page: number;
     limit: number;
     total: number;
-  }
+  },
 ): Response {
   const totalPages = Math.ceil(pagination.total / pagination.limit);
 

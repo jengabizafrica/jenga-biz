@@ -26,6 +26,29 @@ export default function RegisterPage() {
   useEffect(() => {
     const code = searchParams.get('invite_code') || searchParams.get('invite') || '';
     const em = searchParams.get('email') || '';
+    // If the auth redirect included tokens (access_token + refresh_token), set the session
+    // and show the welcome toast. This covers the case where server returned a session
+    // and redirected back to the client with tokens in the URL.
+    (async () => {
+      try {
+        const accessToken = searchParams.get('access_token');
+        const refreshToken = searchParams.get('refresh_token');
+        const type = searchParams.get('type');
+        if (accessToken && refreshToken && (type === 'signup' || type === 'recovery' || type === 'signup_invite')) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken } as any);
+          if (!error) {
+            toast({ title: 'Welcome', description: 'You are signed in.' });
+            // Clean up URL params and redirect to home
+            navigate('/');
+            return;
+          } else {
+            console.error('Register: failed to set session from URL tokens', error);
+          }
+        }
+      } catch (e) {
+        console.error('Register: error handling URL session tokens', e);
+      }
+    })();
     if (code) {
       setInviteCode(code);
       setInviteLocked(true);
@@ -209,8 +232,66 @@ export default function RegisterPage() {
         console.error('consumeInvite error', e);
       }
 
-  toast({ title: 'Account created', description: 'Please check your email to confirm.' });
-      navigate('/');
+      // If the server returned a response for the invite-signup flow, it will
+      // include `created: true` and a `token_exchanged` boolean indicating whether
+      // the server was able to exchange credentials for a session. Respect that
+      // and set the client session when provided.
+      try {
+        if (inviteCode && signUpData) {
+          const created = (signUpData as any).created;
+          const tokenExchanged = (signUpData as any).token_exchanged;
+          const serverSession = (signUpData as any).session || null;
+
+          if (created && tokenExchanged && serverSession && serverSession.access_token) {
+            const { error: setSessionError } = await supabase.auth.setSession({
+              access_token: serverSession.access_token,
+              refresh_token: serverSession.refresh_token,
+            } as any);
+
+            if (setSessionError) {
+              console.error('Failed to set session from server response:', setSessionError);
+              toast({ title: 'Account created', description: 'Please check your email to confirm.' });
+              navigate('/');
+            } else {
+              toast({ title: `Welcome ${fullName || ''}`, description: 'You are signed in.' });
+              navigate('/');
+            }
+          } else if (created && tokenExchanged === false) {
+            // Server created account but could not exchange tokens — instruct user to sign in
+            toast({ title: 'Account created', description: 'Please sign in to access your account.' });
+            navigate('/');
+          } else if (created) {
+            // Created but unknown token_exchanged state — fallback to generic message
+            toast({ title: 'Account created', description: 'Please check your email to confirm.' });
+            navigate('/');
+          }
+        } else {
+          // Non-invite flow uses the client SDK's signup behavior
+          const serverSession = (signUpData && (signUpData as any).data && (signUpData as any).data.session) || (signUpData && (signUpData as any).session);
+          if (serverSession && serverSession.access_token) {
+            const { error: setSessionError } = await supabase.auth.setSession({
+              access_token: serverSession.access_token,
+              refresh_token: serverSession.refresh_token,
+            } as any);
+
+            if (setSessionError) {
+              console.error('Failed to set session from client signup response:', setSessionError);
+              toast({ title: 'Account created', description: 'Please check your email to confirm.' });
+              navigate('/');
+            } else {
+              toast({ title: `Welcome ${fullName || ''}`, description: 'You are signed in.' });
+              navigate('/');
+            }
+          } else {
+            toast({ title: 'Account created', description: 'Please check your email to confirm.' });
+            navigate('/');
+          }
+        }
+      } catch (e) {
+        console.error('Error processing server session', e);
+        toast({ title: 'Account created', description: 'Please check your email to confirm.' });
+        navigate('/');
+      }
     } catch (e: any) {
       toast({ title: 'Signup error', description: e.message || 'Unknown error', variant: 'destructive' });
     } finally {

@@ -3,72 +3,72 @@
  * Handles all financial operations including transactions, OCR, and calculations
  */
 
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
-import { getUserFromRequest } from '../_shared/auth.ts';
-import { 
-  validateBody, 
-  validateQuery, 
-  createTransactionSchema, 
-  updateTransactionSchema,
-  getTransactionsQuerySchema,
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { getUserFromRequest } from "../_shared/auth.ts";
+import {
   createOcrJobSchema,
+  createTransactionSchema,
   getOcrJobsQuerySchema,
+  getTransactionsQuerySchema,
   sanitizeString,
-  uuidSchema
-} from '../_shared/validation.ts';
-import { 
-  handleCors, 
-  successResponse, 
-  errorResponse, 
-  handleError, 
+  updateTransactionSchema,
+  uuidSchema,
+  validateBody,
+  validateQuery,
+} from "../_shared/validation.ts";
+import {
+  createdResponse,
+  errorResponse,
+  handleCors,
+  handleError,
   paginatedResponse,
-  createdResponse 
-} from '../_shared/responses.ts';
+  successResponse,
+} from "../_shared/responses.ts";
 
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return handleCors();
   }
 
   try {
     const url = new URL(req.url);
-    const pathSegments = url.pathname.split('/').filter(Boolean);
+    const pathSegments = url.pathname.split("/").filter(Boolean);
     const lastSegment = pathSegments[pathSegments.length - 1];
     const method = req.method;
 
     // Route handling for transactions
-    if (method === 'GET' && lastSegment === 'transactions') {
+    if (method === "GET" && lastSegment === "transactions") {
       return await getTransactions(req);
     }
-    
-    if (method === 'POST' && lastSegment === 'transactions') {
+
+    if (method === "POST" && lastSegment === "transactions") {
       return await createTransaction(req);
     }
-    
-    if (method === 'PATCH' && pathSegments.includes('transactions')) {
+
+    if (method === "PATCH" && pathSegments.includes("transactions")) {
       return await updateTransaction(req);
     }
-    
-    if (method === 'DELETE' && pathSegments.includes('transactions')) {
+
+    if (method === "DELETE" && pathSegments.includes("transactions")) {
       return await deleteTransaction(req);
     }
 
     // Route handling for financial calculations
-    if (method === 'GET' && lastSegment === 'summary') {
+    if (method === "GET" && lastSegment === "summary") {
       return await getFinancialSummary(req);
     }
 
     // Route handling for OCR operations
-    if (method === 'POST' && lastSegment === 'ocr') {
+    if (method === "POST" && lastSegment === "ocr") {
       return await processOcrJob(req);
     }
-    
-    if (method === 'GET' && pathSegments.includes('ocr')) {
+
+    if (method === "GET" && pathSegments.includes("ocr")) {
       return await getOcrJobs(req);
     }
 
-    return errorResponse('NOT_FOUND', 'Endpoint not found', 404);
+    return errorResponse("NOT_FOUND", "Endpoint not found", 404);
   } catch (error) {
     return handleError(error);
   }
@@ -80,63 +80,63 @@ const handler = async (req: Request): Promise<Response> => {
  */
 async function getTransactions(req: Request): Promise<Response> {
   const { user, supabase } = await getUserFromRequest(req);
-  
+
   const url = new URL(req.url);
   const query = validateQuery(url, getTransactionsQuerySchema);
-  const { 
-    page, 
-    limit, 
-    type, 
-    category, 
-    currency, 
-    date_from, 
-    date_to, 
-    min_amount, 
-    max_amount, 
-    sort_by, 
-    sort_order 
+  const {
+    page,
+    limit,
+    type,
+    category,
+    currency,
+    date_from,
+    date_to,
+    min_amount,
+    max_amount,
+    sort_by,
+    sort_order,
   } = query;
-  
+
   const offset = (page - 1) * limit;
 
   // Build query
   let dbQuery = supabase
-    .from('financial_transactions')
-    .select('*', { count: 'exact' })
-    .eq('user_id', user.id);
+    .from("financial_transactions")
+    .select("*", { count: "exact" })
+    .eq("user_id", user.id);
 
   // Apply filters
   if (type) {
-    dbQuery = dbQuery.eq('transaction_type', type);
+    dbQuery = dbQuery.eq("transaction_type", type);
   }
-  
+
   if (category) {
-    dbQuery = dbQuery.eq('category', category);
+    dbQuery = dbQuery.eq("category", category);
   }
-  
+
   if (currency) {
-    dbQuery = dbQuery.eq('currency', currency);
+    dbQuery = dbQuery.eq("currency", currency);
   }
-  
+
   if (date_from) {
-    dbQuery = dbQuery.gte('transaction_date', date_from);
+    dbQuery = dbQuery.gte("transaction_date", date_from);
   }
-  
+
   if (date_to) {
-    dbQuery = dbQuery.lte('transaction_date', date_to);
+    dbQuery = dbQuery.lte("transaction_date", date_to);
   }
-  
+
   if (min_amount !== undefined) {
-    dbQuery = dbQuery.gte('amount', min_amount);
+    dbQuery = dbQuery.gte("amount", min_amount);
   }
-  
+
   if (max_amount !== undefined) {
-    dbQuery = dbQuery.lte('amount', max_amount);
+    dbQuery = dbQuery.lte("amount", max_amount);
   }
 
   // Apply sorting and pagination
   const { data, error, count } = await dbQuery
-    .order(sort_by, { ascending: sort_order === 'asc' })
+    .order(sort_by, { ascending: sort_order === "asc" })
     .range(offset, offset + limit - 1);
 
   if (error) {
@@ -144,7 +144,7 @@ async function getTransactions(req: Request): Promise<Response> {
   }
 
   // Transform data to match frontend expectations
-  const transactions = data?.map(transaction => ({
+  const transactions = data?.map((transaction) => ({
     id: transaction.id,
     type: transaction.transaction_type,
     amount: Number(transaction.amount),
@@ -174,16 +174,17 @@ async function createTransaction(req: Request): Promise<Response> {
   // Sanitize description
   const sanitizedData = {
     ...transactionData,
-    ...(transactionData.description && { 
-      description: sanitizeString(transactionData.description) 
+    ...(transactionData.description && {
+      description: sanitizeString(transactionData.description),
     }),
   };
 
   // Set default transaction date to today if not provided
-  const transactionDate = sanitizedData.transaction_date || new Date().toISOString().split('T')[0];
+  const transactionDate = sanitizedData.transaction_date ||
+    new Date().toISOString().split("T")[0];
 
   const { data, error } = await supabase
-    .from('financial_transactions')
+    .from("financial_transactions")
     .insert({
       user_id: user.id,
       transaction_type: sanitizedData.type,
@@ -223,39 +224,45 @@ async function createTransaction(req: Request): Promise<Response> {
  */
 async function updateTransaction(req: Request): Promise<Response> {
   const { user, supabase } = await getUserFromRequest(req);
-  
+
   const url = new URL(req.url);
-  const pathSegments = url.pathname.split('/').filter(Boolean);
+  const pathSegments = url.pathname.split("/").filter(Boolean);
   const transactionId = pathSegments[pathSegments.length - 1];
-  
+
   // Validate transaction ID
   uuidSchema.parse(transactionId);
-  
+
   const updates = await validateBody(req, updateTransactionSchema);
 
   // Sanitize description if provided
   const sanitizedUpdates = {
     ...updates,
-    ...(updates.description && { 
-      description: sanitizeString(updates.description) 
+    ...(updates.description && {
+      description: sanitizeString(updates.description),
     }),
   };
 
   // Transform frontend field names to database field names
   const dbUpdates: any = {};
   if (sanitizedUpdates.type) dbUpdates.transaction_type = sanitizedUpdates.type;
-  if (sanitizedUpdates.amount !== undefined) dbUpdates.amount = sanitizedUpdates.amount;
+  if (sanitizedUpdates.amount !== undefined) {
+    dbUpdates.amount = sanitizedUpdates.amount;
+  }
   if (sanitizedUpdates.currency) dbUpdates.currency = sanitizedUpdates.currency;
   if (sanitizedUpdates.category) dbUpdates.category = sanitizedUpdates.category;
-  if (sanitizedUpdates.description !== undefined) dbUpdates.description = sanitizedUpdates.description;
-  if (sanitizedUpdates.transaction_date) dbUpdates.transaction_date = sanitizedUpdates.transaction_date;
+  if (sanitizedUpdates.description !== undefined) {
+    dbUpdates.description = sanitizedUpdates.description;
+  }
+  if (sanitizedUpdates.transaction_date) {
+    dbUpdates.transaction_date = sanitizedUpdates.transaction_date;
+  }
   if (sanitizedUpdates.metadata) dbUpdates.metadata = sanitizedUpdates.metadata;
 
   const { data, error } = await supabase
-    .from('financial_transactions')
+    .from("financial_transactions")
     .update(dbUpdates)
-    .eq('id', transactionId)
-    .eq('user_id', user.id) // Ensure user owns the transaction
+    .eq("id", transactionId)
+    .eq("user_id", user.id) // Ensure user owns the transaction
     .select()
     .single();
 
@@ -285,19 +292,19 @@ async function updateTransaction(req: Request): Promise<Response> {
  */
 async function deleteTransaction(req: Request): Promise<Response> {
   const { user, supabase } = await getUserFromRequest(req);
-  
+
   const url = new URL(req.url);
-  const pathSegments = url.pathname.split('/').filter(Boolean);
+  const pathSegments = url.pathname.split("/").filter(Boolean);
   const transactionId = pathSegments[pathSegments.length - 1];
-  
+
   // Validate transaction ID
   uuidSchema.parse(transactionId);
 
   const { error } = await supabase
-    .from('financial_transactions')
+    .from("financial_transactions")
     .delete()
-    .eq('id', transactionId)
-    .eq('user_id', user.id); // Ensure user owns the transaction
+    .eq("id", transactionId)
+    .eq("user_id", user.id); // Ensure user owns the transaction
 
   if (error) {
     throw error;
@@ -305,7 +312,7 @@ async function deleteTransaction(req: Request): Promise<Response> {
 
   return successResponse({
     transactionId,
-    message: 'Transaction deleted successfully',
+    message: "Transaction deleted successfully",
   });
 }
 
@@ -315,25 +322,25 @@ async function deleteTransaction(req: Request): Promise<Response> {
  */
 async function getFinancialSummary(req: Request): Promise<Response> {
   const { user, supabase } = await getUserFromRequest(req);
-  
+
   const url = new URL(req.url);
-  const currency = url.searchParams.get('currency') || 'KES';
-  const dateFrom = url.searchParams.get('date_from');
-  const dateTo = url.searchParams.get('date_to');
+  const currency = url.searchParams.get("currency") || "KES";
+  const dateFrom = url.searchParams.get("date_from");
+  const dateTo = url.searchParams.get("date_to");
 
   // Build query for calculations
   let query = supabase
-    .from('financial_transactions')
-    .select('transaction_type, amount, category')
-    .eq('user_id', user.id)
-    .eq('currency', currency);
+    .from("financial_transactions")
+    .select("transaction_type, amount, category")
+    .eq("user_id", user.id)
+    .eq("currency", currency);
 
   if (dateFrom) {
-    query = query.gte('transaction_date', dateFrom);
+    query = query.gte("transaction_date", dateFrom);
   }
-  
+
   if (dateTo) {
-    query = query.lte('transaction_date', dateTo);
+    query = query.lte("transaction_date", dateTo);
   }
 
   const { data: transactions, error } = await query;
@@ -343,11 +350,19 @@ async function getFinancialSummary(req: Request): Promise<Response> {
   }
 
   // Calculate totals
-  const incomeTransactions = transactions?.filter(t => t.transaction_type === 'income') || [];
-  const expenseTransactions = transactions?.filter(t => t.transaction_type === 'expense') || [];
+  const incomeTransactions =
+    transactions?.filter((t) => t.transaction_type === "income") || [];
+  const expenseTransactions =
+    transactions?.filter((t) => t.transaction_type === "expense") || [];
 
-  const totalIncome = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalIncome = incomeTransactions.reduce(
+    (sum, t) => sum + Number(t.amount),
+    0,
+  );
+  const totalExpenses = expenseTransactions.reduce(
+    (sum, t) => sum + Number(t.amount),
+    0,
+  );
   const netProfit = totalIncome - totalExpenses;
 
   // Calculate category breakdowns
@@ -391,11 +406,11 @@ async function processOcrJob(req: Request): Promise<Response> {
 
   // Create OCR job record
   const { data: ocrJob, error: insertError } = await supabase
-    .from('ocr_jobs')
+    .from("ocr_jobs")
     .insert({
       user_id: user.id,
       file_path: ocrData.file_path,
-      status: 'pending',
+      status: "pending",
       expected_type: ocrData.expected_type,
     })
     .select()
@@ -417,7 +432,7 @@ async function processOcrJob(req: Request): Promise<Response> {
     status: ocrJob.status,
     file_path: ocrJob.file_path,
     expected_type: ocrJob.expected_type,
-    message: 'OCR job created and queued for processing',
+    message: "OCR job created and queued for processing",
   });
 }
 
@@ -427,35 +442,35 @@ async function processOcrJob(req: Request): Promise<Response> {
  */
 async function getOcrJobs(req: Request): Promise<Response> {
   const { user, supabase } = await getUserFromRequest(req);
-  
+
   const url = new URL(req.url);
   const query = validateQuery(url, getOcrJobsQuerySchema);
   const { page, limit, status, date_from, date_to } = query;
-  
+
   const offset = (page - 1) * limit;
 
   // Build query
   let dbQuery = supabase
-    .from('ocr_jobs')
-    .select('*', { count: 'exact' })
-    .eq('user_id', user.id);
+    .from("ocr_jobs")
+    .select("*", { count: "exact" })
+    .eq("user_id", user.id);
 
   // Apply filters
   if (status) {
-    dbQuery = dbQuery.eq('status', status);
+    dbQuery = dbQuery.eq("status", status);
   }
-  
+
   if (date_from) {
-    dbQuery = dbQuery.gte('created_at', date_from);
+    dbQuery = dbQuery.gte("created_at", date_from);
   }
-  
+
   if (date_to) {
-    dbQuery = dbQuery.lte('created_at', date_to);
+    dbQuery = dbQuery.lte("created_at", date_to);
   }
 
   // Apply pagination and sorting
   const { data, error, count } = await dbQuery
-    .order('created_at', { ascending: false })
+    .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (error) {
