@@ -661,19 +661,20 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
     // and return it so the frontend can sign in and show a welcome toast.
     if (creatorIsSuper) {
       try {
-        const tokenUrl = `${config.supabaseUrl}/auth/v1/token`;
-        const params = new URLSearchParams();
-        params.set("grant_type", "password");
-        params.set("email", body.email);
-        params.set("password", body.password);
+        const tokenUrl = `${config.supabaseUrl}/auth/v1/token?grant_type=password`;
+        const tokenPayload = {
+          email: body.email,
+          password: body.password,
+          gotrue_meta_security: {},
+        };
 
         const tokenResp = await fetch(tokenUrl, {
           method: "POST",
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Type": "application/json",
             "apikey": config.supabaseAnonKey,
           },
-          body: params.toString(),
+          body: JSON.stringify(tokenPayload),
         });
 
         let tokenBody: any = null;
@@ -759,16 +760,17 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
 
           // Try to get a session
           try {
-            const tokenUrl = `${config.supabaseUrl}/auth/v1/token`;
-            const params = new URLSearchParams();
-            params.set('grant_type', 'password');
-            params.set('email', body.email);
-            params.set('password', body.password);
+            const tokenUrl = `${config.supabaseUrl}/auth/v1/token?grant_type=password`;
+            const tokenPayload = {
+              email: body.email,
+              password: body.password,
+              gotrue_meta_security: {},
+            };
 
             const tokenResp = await fetch(tokenUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'apikey': config.supabaseAnonKey },
-              body: params.toString(),
+              headers: { 'Content-Type': 'application/json', 'apikey': config.supabaseAnonKey },
+              body: JSON.stringify(tokenPayload),
             });
 
             let tokenBody: any = null;

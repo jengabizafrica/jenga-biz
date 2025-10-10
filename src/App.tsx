@@ -25,11 +25,17 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { AdminDashboard } from "./components/dashboard/AdminDashboard";
 import HubAdminDashboard from './components/dashboard/HubAdminDashboard';
 import { ServiceWorkerUpdater } from "./components/ServiceWorkerUpdater";
+import { Analytics } from '@vercel/analytics/next';
+import {SpeedInsights} from '@vercel/speed-insights/react';
+
 
 const queryClient = new QueryClient();
 
 const App = () => (
+  //add vercel analytics and speed insights
   <QueryClientProvider client={queryClient}>
+    <Analytics />
+    <SpeedInsights />
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
