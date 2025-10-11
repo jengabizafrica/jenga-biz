@@ -96,6 +96,8 @@ const handler = async (req: Request): Promise<Response> => {
       return await updateUserRole(req);
     }
 
+
+
     if (method === "PATCH" && url.searchParams.has("userId")) {
       return await adminUpdateUser(req);
     }
@@ -351,6 +353,110 @@ async function consumeInvite(req: Request): Promise<Response> {
   });
 }
 
+// POST /user-management/hubs/configure
+async function configureHub(req: Request): Promise<Response> {
+  const { user, supabase } = await getUserFromRequest(req);
+  // Only admins can configure a hub
+  requireAdmin(user);
+
+  // Basic validation: expect name, country, region (optional), contact_email
+  const body = await validateBody(req, z.object({
+    name: z.string().min(1),
+    country: z.string().min(1),
+    region: z.string().optional(),
+    contact_email: z.string().email().optional(),
+  })) as any;
+
+  const service = getServiceRoleClient();
+
+  try {
+    // If the user already has a linked hub (organization_id or hub_id on profile), update that hub.
+    const { data: profile } = await service
+      .from('profiles')
+      .select('id, organization_id, organization_name')
+      .eq('id', user.id)
+      .single();
+
+    let hubId = profile?.organization_id || null;
+
+    if (hubId) {
+      // Update existing hub
+      const { error: updateErr } = await service
+        .from('hubs')
+        .update({
+          name: body.name.trim(),
+          country: body.country.trim(),
+          region: body.region?.trim() || null,
+          contact_email: body.contact_email?.trim() || null,
+        })
+        .eq('id', hubId);
+      if (updateErr) throw updateErr;
+    } else {
+      // Create hub row
+      const { data: created, error: createErr } = await service
+        .from('hubs')
+        .insert({
+          name: body.name.trim(),
+          country: body.country.trim(),
+          region: body.region?.trim() || null,
+          contact_email: body.contact_email?.trim() || null,
+        })
+        .select('id')
+        .single();
+      if (createErr) throw createErr;
+      hubId = created?.id;
+
+      // Update profile to link to the new hub
+      if (hubId) {
+        const { error: profileErr } = await service
+          .from('profiles')
+          .update({ organization_id: hubId, organization_name: body.name.trim() })
+          .eq('id', user.id);
+        if (profileErr) throw profileErr;
+      }
+    }
+
+    // Update requester user_roles rows to set hub_id where role = 'admin'
+    try {
+      const { error: rolesErr } = await service
+        .from('user_roles')
+        .update({ hub_id: hubId })
+        .eq('user_id', user.id)
+        .eq('role', 'admin');
+      if (rolesErr) throw rolesErr;
+    } catch (e) {
+      console.warn('Failed to update requester user_roles.hub_id (non-fatal):', e);
+    }
+
+    // Set hubs.admin_user_id for convenience
+    try {
+      const { error: hubAdminErr } = await service
+        .from('hubs')
+        .update({ admin_user_id: user.id })
+        .eq('id', hubId);
+      if (hubAdminErr) throw hubAdminErr;
+    } catch (e) {
+      console.warn('Failed to set hubs.admin_user_id (non-fatal):', e);
+    }
+
+    // Insert default app settings for the hub if table exists (best-effort)
+    try {
+      const defaultSettings = { hub_id: hubId, key: 'defaults:welcome_message', value: 'Welcome to your hub' } as any;
+      const { error: settingsErr } = await service.from('hub_settings').insert(defaultSettings);
+      if (settingsErr && (settingsErr as any).code !== '42P01') {
+        // 42P01 = table does not exist in some environments; ignore that
+        console.warn('Failed to insert default hub settings (ignored):', settingsErr);
+      }
+    } catch (e) {
+      console.debug('hub_settings insert skipped or failed (ignored):', e);
+    }
+
+    return successResponse({ hub_id: hubId, message: 'Hub configured' });
+  } catch (e) {
+    return handleError(e);
+  }
+}
+
 // POST /user-management/invite-signup
 // Body: { email, password, full_name, account_type, invite_code }
 async function inviteSignupAndConsume(req: Request): Promise<Response> {
@@ -602,6 +708,29 @@ async function inviteSignupAndConsume(req: Request): Promise<Response> {
     // the invite-codes consume flow so org invites created by super_admin produce admin users.
     if ((invite as any)?.account_type === "organization") {
       try {
+        // First: remove the default 'hub_manager' role that the DB trigger
+        // `public.handle_new_user()` inserts for organization invites. We want
+        // the final state to be only the 'admin' role for org invitees created
+        // by super_admins. This delete is idempotent and safe to run even if
+        // the trigger didn't insert that role yet (it will simply affect 0 rows).
+        try {
+          const { error: removeErr } = await service
+            .from("user_roles")
+            .delete()
+            .eq("user_id", createdAuthUserId)
+            .eq("role", "hub_manager");
+
+          if (removeErr) {
+            // Log but continue: don't fail the whole flow because of this
+            // delete; we still attempt to assign the admin role below.
+            console.warn("Failed to remove default hub_manager role:", removeErr);
+          } else {
+            console.debug("Removed default hub_manager role for organization invitee", { user: createdAuthUserId });
+          }
+        } catch (delErr) {
+          console.warn("Error deleting default hub_manager role (ignored):", delErr);
+        }
+
         // Attempt to call the atomic role-replace RPC `set_user_role` which should
         // be created in the database. Provide hub_id when applicable (admin hub context),
         // otherwise null for a global admin assignment. If the RPC is missing or fails,
