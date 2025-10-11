@@ -1,0 +1,20 @@
+to do: hubs
+hub admin invite auto confirm email and token/session return session on consume register
+user list_by hub_id scope in saas
+create hub manager flow for hub admin dash
+hub_id scoped user financial records aggregation edge functions debug
+hub impersonation auth/hub context flow
+cleanup redundant tabs in analytics dash
+admin dash obfuscation for hub man
+milestone and strat hubid scoping
+
+to do: b2c
+user financial records aggregation edge functions debug
+subscription gating
+paystack webhook flow and testing
+
+
+to do: general
+cascade on delete logic
+pwa workbox caching opt
+realtime and push notifications

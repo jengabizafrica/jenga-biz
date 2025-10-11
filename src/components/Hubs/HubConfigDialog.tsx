@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoles } from '@/hooks/useRoles';
+import { useHubContext } from '@/hooks/useHubContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface HubConfigDialogProps {
@@ -17,6 +18,7 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
   const { user } = useAuth();
   const { roles } = useRoles();
   const { toast } = useToast();
+  const { refreshContext, setCurrentHubOptimistic } = useHubContext();
   const [loading, setLoading] = useState(false);
   const [hubId, setHubId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', country: '', region: '', contact_email: '' });
@@ -29,11 +31,11 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('organization_id, organization_name, country, email')
+          .select('hub_id, organization_name, country, email')
           .eq('id', user.id)
           .single();
-
-        let currentHubId = profile?.organization_id || null;
+        const profileAny = profile as any;
+        let currentHubId = profileAny?.hub_id || null;
         if (currentHubId) {
           const { data: hub } = await supabase
             .from('hubs')
@@ -43,10 +45,10 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
           if (hub) {
             setHubId(hub.id);
             setForm({
-              name: hub.name || profile?.organization_name || '',
-              country: hub.country || profile?.country || '',
+              name: hub.name || profileAny?.organization_name || '',
+              country: hub.country || profileAny?.country || '',
               region: hub.region || '',
-              contact_email: hub.contact_email || profile?.email || ''
+              contact_email: hub.contact_email || profileAny?.email || ''
             });
             setLoading(false);
             return;
@@ -55,10 +57,10 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
         // Prefill from profile if no hub exists
         setHubId(null);
         setForm({
-          name: profile?.organization_name || '',
-          country: profile?.country || '',
+          name: profileAny?.organization_name || '',
+          country: profileAny?.country || '',
           region: '',
-          contact_email: profile?.email || ''
+          contact_email: profileAny?.email || ''
         });
       } finally {
         setLoading(false);
@@ -93,12 +95,12 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
       if (hubId) payload.id = hubId;
 
       // Call hub-management function
-      console.debug('HubConfigDialog: sending payload to hub-management', payload);
+      console.log('HubConfigDialog: sending payload to hub-management', payload);
       const { data, error } = await supabase.functions.invoke('hub-management', {
         body: JSON.stringify({ action: hubId ? 'update' : 'create', ...payload }),
       });
 
-      console.debug('HubConfigDialog: raw invoke result', { data, error });
+      console.log('HubConfigDialog: raw invoke result', { data, error });
 
       if (error) {
         throw error;
@@ -109,11 +111,11 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
       try {
         parsed = typeof data === 'string' ? JSON.parse(data) : data;
       } catch (parseErr) {
-        console.debug('HubConfigDialog: failed to parse invoke response, using raw data', parseErr);
+        console.log('HubConfigDialog: failed to parse invoke response, using raw data', parseErr);
         parsed = data;
       }
 
-      console.debug('HubConfigDialog: parsed response', parsed);
+      console.log('HubConfigDialog: parsed response', parsed);
 
       if (!parsed || !parsed.success) {
         const msg = parsed?.error?.message || 'Failed to save hub';
@@ -122,9 +124,26 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
 
       const createdHub = parsed.data?.hub || parsed.data;
       if (createdHub?.id) {
-        // Update profile locally to reflect new hub
-        await supabase.from('profiles').update({ organization_id: createdHub.id }).eq('id', user.id);
+  // Update profile locally to reflect new hub (hub_id is the FK used by hubs)
+  await supabase.from('profiles').update({ hub_id: createdHub.id } as any).eq('id', user.id);
         setHubId(createdHub.id);
+        // Optimistic update: set currentHub immediately so UI unblocks
+        try {
+          setCurrentHubOptimistic({
+            id: createdHub.id,
+            name: createdHub.name,
+            slug: createdHub.slug || '',
+            country: createdHub.country || ''
+          });
+        } catch (e) {
+          console.log('HubConfigDialog: optimistic setCurrentHub failed', e);
+        }
+        try {
+          console.log('HubConfigDialog: refreshing hub context after create');
+          await refreshContext();
+        } catch (err) {
+          console.log('HubConfigDialog: refreshContext failed', err);
+        }
       }
       toast({ title: 'Hub saved', description: 'Your hub settings have been updated.' });
       onOpenChange(false);
