@@ -11,6 +11,7 @@ import { ImpactMeasurementDashboard } from '@/components/analytics/ImpactMeasure
 import { AdminDashboard } from '@/components/dashboard/AdminDashboard';
 
 import { useHubContext } from '@/hooks/useHubContext';
+import { useRoles } from '@/hooks/useRoles';
 import { useHubAnalytics } from '@/hooks/useHubAnalytics';
 import { ImpersonationBanner } from '@/components/ImpersonationBanner';
 import { Separator } from '@/components/ui/separator';
@@ -35,6 +36,7 @@ interface SaaSFeaturesProps {
 
 const SaaSFeatures = ({ onSignOut }: SaaSFeaturesProps) => {
   const { signOut } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [analyticsPanel, setAnalyticsPanel] = useState<string | undefined>(undefined);
   const [showInvite, setShowInvite] = useState(false);
@@ -43,6 +45,14 @@ const SaaSFeatures = ({ onSignOut }: SaaSFeaturesProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentHub, isImpersonating } = useHubContext();
   const { data: hubAnalytics, isLoading: analyticsLoading, error: analyticsError } = useHubAnalytics();
+  const { roles, loading: rolesLoading } = useRoles();
+
+  // Determine if the logged-in user is an admin who hasn't configured a hub yet.
+  // In that case, block interaction with SaaS features until they configure the hub.
+  const isAdminUser = (roles || []).includes('admin') || (roles || []).includes('super_admin');
+  const requiresHubConfig = !rolesLoading && isAdminUser && !currentHub;
+
+  console.debug('SaaSFeatures: role check', { roles, isAdminUser, requiresHubConfig, currentHub });
 
   useEffect(() => {
     // Initialize from URL query params: ?tab=analytics&panel=reporting
@@ -53,6 +63,17 @@ const SaaSFeatures = ({ onSignOut }: SaaSFeaturesProps) => {
       setAnalyticsPanel(panel);
     }
   }, [searchParams]);
+
+  // If the admin user lacks a hub, open the hub config dialog on mount.
+  useEffect(() => {
+    if (requiresHubConfig) {
+      setShowHubConfig(true);
+    }
+  }, [requiresHubConfig]);
+  
+  
+
+ 
 
   const handleSignOut = async () => {
     await signOut();
@@ -93,25 +114,29 @@ const SaaSFeatures = ({ onSignOut }: SaaSFeaturesProps) => {
       {/* Main Content */}
       <div className="flex-1 space-y-4 p-6">
         <ImpersonationBanner />
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="relative">
+          <Tabs value={activeTab} onValueChange={(v) => {
+            // Prevent tab changes while admin is required to configure hub
+            if (!requiresHubConfig) setActiveTab(v);
+          }} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
+            <TabsTrigger value="overview" className="flex items-center gap-2" disabled={requiresHubConfig}>
               <BarChart3 className="h-4 w-4" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <TabsTrigger value="analytics" className="flex items-center gap-2" disabled={requiresHubConfig}>
               <TrendingUp className="h-4 w-4" />
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="financial" className="flex items-center gap-2">
+            <TabsTrigger value="financial" className="flex items-center gap-2" disabled={requiresHubConfig}>
               <DollarSign className="h-4 w-4" />
               Financial
             </TabsTrigger>
-            <TabsTrigger value="impact" className="flex items-center gap-2">
+            <TabsTrigger value="impact" className="flex items-center gap-2" disabled={requiresHubConfig}>
               <Target className="h-4 w-4" />
               Impact
             </TabsTrigger>
-            <TabsTrigger value="admin" className="flex items-center gap-2">
+            <TabsTrigger value="admin" className="flex items-center gap-2" disabled={requiresHubConfig}>
               <Users className="h-4 w-4" />
               Admin
             </TabsTrigger>
@@ -231,6 +256,21 @@ const SaaSFeatures = ({ onSignOut }: SaaSFeaturesProps) => {
             <AdminDashboard saasMode />
           </TabsContent>
         </Tabs>
+
+          {/* If admin must configure hub, render a blocking overlay over the tabs area with a CTA */}
+          {requiresHubConfig && (
+            <div className="absolute inset-0 z-40 flex items-center justify-center">
+              <div className="w-full max-w-2xl mx-4 p-6 bg-white/95 border rounded-lg shadow-lg text-center">
+                <h2 className="text-lg font-semibold mb-2">Configure your hub to continue</h2>
+                <p className="text-sm text-muted-foreground mb-4">Before using the SaaS dashboard you must create or configure your Hub/Organization. Only hub admins can perform this step.</p>
+                <div className="flex items-center justify-center gap-4">
+                  <Button variant="default" onClick={() => setShowHubConfig(true)}>Configure Hub</Button>
+                  <Button variant="ghost" onClick={() => { signOut(); onSignOut(); window.location.href = '/'; }}>Sign out</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Invite Users Dialog */}
         <Dialog open={showInvite} onOpenChange={setShowInvite}>

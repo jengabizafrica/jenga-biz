@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useRoles } from '@/hooks/useRoles';
 import { useToast } from '@/hooks/use-toast';
 
 interface HubConfigDialogProps {
@@ -14,6 +15,7 @@ interface HubConfigDialogProps {
 
 export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
   const { user } = useAuth();
+  const { roles } = useRoles();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [hubId, setHubId] = useState<string | null>(null);
@@ -73,36 +75,56 @@ export function HubConfigDialog({ open, onOpenChange }: HubConfigDialogProps) {
     if (!user) return;
     setLoading(true);
     try {
-      if (hubId) {
-        const { error } = await supabase
-          .from('hubs')
-          .update({
-            name: form.name.trim(),
-            country: form.country.trim(),
-            region: form.region.trim() || null,
-            contact_email: form.contact_email.trim() || null,
-          })
-          .eq('id', hubId);
-        if (error) throw error;
-      } else {
-        const { data: created, error } = await supabase
-          .from('hubs')
-          .insert({
-            name: form.name.trim(),
-            country: form.country.trim(),
-            region: form.region.trim() || null,
-            contact_email: form.contact_email.trim() || null,
-          })
-          .select('id')
-          .single();
-        if (error) throw error;
-        if (created?.id) {
-          await supabase
-            .from('profiles')
-            .update({ organization_id: created.id })
-            .eq('id', user.id);
-          setHubId(created.id);
-        }
+      // Only allow admins to create or link hubs here; requireAdmin is enforced server-side
+      if (!roles?.includes('admin') && !roles?.includes('super_admin')) {
+        toast({ title: 'Unauthorized', description: 'Only admins can configure a hub', variant: 'destructive' });
+        return;
+      }
+
+      // If hub exists, call function to update hub. If not, call create route.
+      const payload = {
+        name: form.name.trim(),
+        country: form.country.trim(),
+        region: form.region.trim() || null,
+        contact_email: form.contact_email.trim() || null,
+        slug: undefined,
+      } as any;
+
+      if (hubId) payload.id = hubId;
+
+      // Call hub-management function
+      console.debug('HubConfigDialog: sending payload to hub-management', payload);
+      const { data, error } = await supabase.functions.invoke('hub-management', {
+        body: JSON.stringify({ action: hubId ? 'update' : 'create', ...payload }),
+      });
+
+      console.debug('HubConfigDialog: raw invoke result', { data, error });
+
+      if (error) {
+        throw error;
+      }
+
+      // Supabase Functions returns raw text in data by default; parse if needed
+      let parsed: any = null;
+      try {
+        parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      } catch (parseErr) {
+        console.debug('HubConfigDialog: failed to parse invoke response, using raw data', parseErr);
+        parsed = data;
+      }
+
+      console.debug('HubConfigDialog: parsed response', parsed);
+
+      if (!parsed || !parsed.success) {
+        const msg = parsed?.error?.message || 'Failed to save hub';
+        throw new Error(msg);
+      }
+
+      const createdHub = parsed.data?.hub || parsed.data;
+      if (createdHub?.id) {
+        // Update profile locally to reflect new hub
+        await supabase.from('profiles').update({ organization_id: createdHub.id }).eq('id', user.id);
+        setHubId(createdHub.id);
       }
       toast({ title: 'Hub saved', description: 'Your hub settings have been updated.' });
       onOpenChange(false);
