@@ -237,12 +237,13 @@ export default function RegisterPage() {
       // the server was able to exchange credentials for a session. Respect that
       // and set the client session when provided.
       try {
-        if (inviteCode && signUpData) {
-          const created = (signUpData as any).created;
-          const tokenExchanged = (signUpData as any).token_exchanged;
-          const serverSession = (signUpData as any).session || null;
+        if (inviteCode && signUpData?.data) {
+          const created = signUpData.data.created;
+          const tokenExchanged = signUpData.data.token_exchanged;
+          const serverSession = signUpData.data.session;
+          const welcomeMessage = signUpData.data.message;
 
-          if (created && tokenExchanged && serverSession && serverSession.access_token) {
+          if (created && tokenExchanged && serverSession?.access_token) {
             const { error: setSessionError } = await supabase.auth.setSession({
               access_token: serverSession.access_token,
               refresh_token: serverSession.refresh_token,
@@ -251,11 +252,11 @@ export default function RegisterPage() {
             if (setSessionError) {
               console.error('Failed to set session from server response:', setSessionError);
               toast({ title: 'Account created', description: 'Please check your email to confirm.' });
-              navigate('/');
             } else {
-              toast({ title: `Welcome ${fullName || ''}`, description: 'You are signed in.' });
-              navigate('/');
+              toast({ title: `Welcome!`, description: welcomeMessage || `Welcome ${fullName || ''}` });
             }
+
+            navigate('/');
           } else if (created && tokenExchanged === false) {
             // Server created account but could not exchange tokens — instruct user to sign in
             toast({ title: 'Account created', description: 'Please sign in to access your account.' });
