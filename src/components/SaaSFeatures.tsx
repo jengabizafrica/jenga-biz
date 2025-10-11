@@ -52,7 +52,7 @@ const SaaSFeatures = ({ onSignOut }: SaaSFeaturesProps) => {
   const isAdminUser = (roles || []).includes('admin') || (roles || []).includes('super_admin');
   const requiresHubConfig = !rolesLoading && isAdminUser && !currentHub;
 
-  console.debug('SaaSFeatures: role check', { roles, isAdminUser, requiresHubConfig, currentHub });
+  console.log('SaaSFeatures: role check', { roles, isAdminUser, requiresHubConfig, currentHub });
 
   useEffect(() => {
     // Initialize from URL query params: ?tab=analytics&panel=reporting

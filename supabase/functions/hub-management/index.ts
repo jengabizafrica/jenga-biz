@@ -29,6 +29,37 @@ function errorResponse(code: string, message: string, status = 400) {
   });
 }
 
+// CORS helper: reflect origin when present and add common CORS headers
+function buildCorsHeaders(req: Request) {
+  const denoAny: any = (globalThis as any)['Deno'];
+  const origin = req.headers.get('origin') || (denoAny && denoAny.env && denoAny.env.get('ALLOWED_ORIGIN')) || '*';
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Origin': origin,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS,PATCH,DELETE',
+    // include supabase SDK headers which are sent by the client
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, apikey, x-api-key, x-client-info, x-supabase-api-version',
+  };
+  return headers;
+}
+
+async function withCors(resp: Response, req: Request): Promise<Response> {
+  try {
+    const corsHeaders = buildCorsHeaders(req);
+    // read body as text (responses from this function are JSON strings)
+    const body = await resp.text().catch(() => null);
+    const headers = new Headers(resp.headers || {});
+    for (const k of Object.keys(corsHeaders)) headers.set(k, (corsHeaders as any)[k]);
+    // Ensure content-type preserved
+    if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    return new Response(body, { status: resp.status, headers });
+  } catch (e) {
+    // fallback: return original response
+    return resp;
+  }
+}
+
 async function handleCreateHub(req: Request) {
   try {
     const { user, supabase: userClient } = await getUserFromRequest(req);
@@ -172,19 +203,26 @@ async function handleCreateHub(req: Request) {
 }
 
 const handler = async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204 });
+  // Preflight: reply with CORS headers
+  if (req.method === 'OPTIONS') {
+    const headers = buildCorsHeaders(req);
+    return new Response(null, { status: 204, headers });
+  }
 
   try {
     const url = new URL(req.url);
-    if (req.method === 'POST' && url.pathname.endsWith('/create')) {
-      console.debug('hub-management: routing to create', { url: req.url });
-      return await handleCreateHub(req);
+    if (req.method === 'POST') {
+      // Accept POST to the function root or any subpath for compatibility with
+      // supabase.functions.invoke which posts to the function name path.
+      console.debug('hub-management: routing POST to create (any path)', { url: req.url });
+      const resp = await handleCreateHub(req);
+      return await withCors(resp, req);
     }
 
-    return new Response('Not Found', { status: 404 });
+    return await withCors(new Response('Not Found', { status: 404 }), req);
   } catch (e) {
     console.error('hub-management error:', e);
-    return new Response('Internal Server Error', { status: 500 });
+    return await withCors(new Response('Internal Server Error', { status: 500 }), req);
   }
 };
 
