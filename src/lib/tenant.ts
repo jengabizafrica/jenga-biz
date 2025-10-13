@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 
 export interface ImpersonationSession {
   target_hub_id: string;
@@ -53,20 +53,34 @@ export async function getCurrentImpersonationStatus(): Promise<{
   error?: string;
 }> {
   try {
-  const { error, data } = await supabase.functions.invoke('hub-impersonation');
-
-    if (error) {
-      console.error('Get impersonation status error:', error);
-      return { isImpersonating: false, error: error.message };
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      return { isImpersonating: false, error: 'Not authenticated' };
     }
 
+    const functionsBase = SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co').replace(/\/$/, '');
+    const res = await fetch(`${functionsBase}/hub-impersonation`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return { isImpersonating: false, error: text || `Status ${res.status}` };
+    }
+
+    const data = await res.json();
     return {
-      isImpersonating: data.isImpersonating,
+      isImpersonating: !!data.isImpersonating,
       session: data.session
     };
-  } catch (err) {
+  } catch (err: any) {
     console.error('Get impersonation status error:', err);
-    return { isImpersonating: false, error: 'Failed to get impersonation status' };
+    return { isImpersonating: false, error: err?.message || 'Failed to get impersonation status' };
   }
 }
 

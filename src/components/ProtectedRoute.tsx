@@ -33,9 +33,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Check role-based access
   if (allowedRoles) {
-    // If user exists but roles haven't loaded or are empty, wait a tick to avoid false redirects
-    if (roles.length === 0) return null;
-
     const isAllowed = roles.includes('super_admin') || roles.some(r => allowedRoles.includes(r));
     if (!isAllowed) return <Navigate to="/" replace />;
   }
