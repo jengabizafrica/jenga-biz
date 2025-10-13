@@ -96,11 +96,9 @@ class EdgeFunctionsApiClient {
   private baseUrl: string;
 
   constructor() {
-    const root = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-    // Prefer the dedicated functions domain to avoid proxy/CORS issues
-    // e.g., https://<project>.supabase.co -> https://<project>.functions.supabase.co
-    const functionsDomain = root.replace('https://', 'https://').replace('.supabase.co', '.functions.supabase.co');
-    this.baseUrl = functionsDomain;
+    // Use the project ID directly to construct the functions URL
+    const projectId = 'diclwatocrixibjpajuf';
+    this.baseUrl = `https://${projectId}.supabase.co/functions/v1`;
   }
 
   /**
@@ -108,7 +106,7 @@ class EdgeFunctionsApiClient {
    */
   private async getAuthHeaders(): Promise<Record<string, string>> {
     const { data: { session } } = await supabase.auth.getSession();
-    const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+    const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpY2x3YXRvY3JpeGlianBhanVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDIyNjEsImV4cCI6MjA3MDIxODI2MX0.414UJ0ghcBsQ6jbOd7TkjQivvOkBVX-G5qpYuO_oYNs';
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
