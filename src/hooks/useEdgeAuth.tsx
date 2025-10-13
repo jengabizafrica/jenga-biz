@@ -111,7 +111,9 @@ export const EdgeAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
       return { error };
     } catch (error) {
       return { error };
