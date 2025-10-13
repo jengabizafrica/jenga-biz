@@ -47,9 +47,11 @@ const PasswordReset = () => {
 
   useEffect(() => {
     const checkResetToken = async () => {
-      const accessToken = searchParams.get('access_token');
-      const refreshToken = searchParams.get('refresh_token');
-      const type = searchParams.get('type');
+      // Parse tokens from URL hash (Supabase redirects with hash fragments)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+      const type = hashParams.get('type') || searchParams.get('type');
 
       if (!accessToken || !refreshToken || type !== 'recovery') {
         setIsValidToken(false);
@@ -74,6 +76,9 @@ const PasswordReset = () => {
         }
 
         setIsValidToken(true);
+        
+        // Clean up the URL by removing hash parameters
+        window.history.replaceState({}, document.title, window.location.pathname);
       } catch (error: any) {
         console.error('Error validating reset token:', error);
         setIsValidToken(false);
