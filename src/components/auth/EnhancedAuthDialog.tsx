@@ -287,7 +287,7 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[65vh] sm:max-h-[90vh] overflow-y-auto pb-20 sm:pb-6">
         <DialogHeader>
           <DialogTitle className="text-center text-foreground">Welcome to Jenga Biz Africa</DialogTitle>
         </DialogHeader>
