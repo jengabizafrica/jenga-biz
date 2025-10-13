@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => ({
       // Using existing manifest file
       manifest: false,
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit for large apps
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,gif,webp,woff2,woff,ttf}'],
         runtimeCaching: [
           // Cache Supabase Edge Functions with different strategies based on function type

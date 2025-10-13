@@ -19,7 +19,6 @@ import Pricing from "./pages/Pricing";
 import BillingReturn from "./pages/BillingReturn";
 import UserDashboard from "./components/UserDashboard";
 import SaaSFeatures from "./components/SaaSFeatures";
-import { HubProvider } from '@/contexts/HubContext';
 import { HubContextProvider } from '@/hooks/useHubContext';
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AdminDashboard } from "./components/dashboard/AdminDashboard";
@@ -42,10 +41,9 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <ServiceWorkerUpdater />
-          <HubProvider>
-            <HubContextProvider>
-              <ImpersonationBanner />
-              <Routes>
+          <HubContextProvider>
+            <ImpersonationBanner />
+            <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/reset-password" element={<PasswordReset />} />
                 <Route path="/register" element={<Register />} />
@@ -62,9 +60,8 @@ const App = () => (
                 <Route path="/b2c" element={<Index />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
-              </Routes>
-            </HubContextProvider>
-          </HubProvider>
+            </Routes>
+          </HubContextProvider>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
