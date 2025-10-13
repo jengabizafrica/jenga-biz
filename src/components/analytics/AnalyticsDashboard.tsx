@@ -10,10 +10,9 @@ import { GeographicChart } from './GeographicChart';
 import { ActivityChart } from './ActivityChart';
 import { EngagementMetrics } from './EngagementMetrics';
 import { BusinessIntelligenceDashboard } from './BusinessIntelligenceDashboard';
-import { ImpactMeasurementDashboard } from './ImpactMeasurementDashboard';
 import { ReportingDashboard } from './ReportingDashboard';
 import { FinancialInsightsDashboard } from './FinancialInsightsDashboard';
-import { ProFeature, PremiumFeature } from '@/components/SubscriptionGate';
+import { ProFeature } from '@/components/SubscriptionGate';
 
 interface DashboardMetrics {
   totalUsers: number;
@@ -218,12 +217,9 @@ export const AnalyticsDashboard = ({ initialPanel }: { initialPanel?: string | n
 
       {/* Detailed Analytics */}
       <Tabs value={panel} onValueChange={(v) => setPanel(v)} className="w-full">
-        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 h-auto gap-1 p-1">
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 h-auto gap-1 p-1">
           <TabsTrigger value="business-intelligence" className="text-xs sm:text-sm px-2 py-2 whitespace-nowrap">
             BI Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="impact" className="text-xs sm:text-sm px-2 py-2 whitespace-nowrap">
-            Impact
           </TabsTrigger>
           <TabsTrigger value="reporting" className="text-xs sm:text-sm px-2 py-2 whitespace-nowrap">
             Reports
@@ -246,12 +242,6 @@ export const AnalyticsDashboard = ({ initialPanel }: { initialPanel?: string | n
           <ProFeature feature="Business Intelligence Dashboard">
             <BusinessIntelligenceDashboard />
           </ProFeature>
-        </TabsContent>
-
-        <TabsContent value="impact" className="space-y-4">
-          <PremiumFeature feature="Impact Measurement Dashboard">
-            <ImpactMeasurementDashboard />
-          </PremiumFeature>
         </TabsContent>
 
         <TabsContent value="reporting" className="space-y-4">
