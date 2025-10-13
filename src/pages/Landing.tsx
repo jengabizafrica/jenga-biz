@@ -9,10 +9,14 @@ import { useRoles } from '@/hooks/useRoles';
 import { useNavigate } from 'react-router-dom';
 
 const RoleAwareSaaSButton = () => {
-  const { roles } = useRoles();
+  const { roles, loading } = useRoles();
   const navigate = useNavigate();
+  
+  if (loading) return null;
+  
   const canSee = roles.includes('super_admin') || roles.includes('admin') || roles.includes('hub_manager');
   if (!canSee) return null;
+  
   return (
     <Button
       variant="outline"
@@ -27,9 +31,12 @@ const RoleAwareSaaSButton = () => {
 };
 
 const RoleAwareSuperAdminButton = () => {
-  const { roles } = useRoles();
+  const { roles, loading } = useRoles();
   const navigate = useNavigate();
+  
+  if (loading) return null;
   if (!roles.includes('super_admin')) return null;
+  
   return (
     <Button
       variant="outline"

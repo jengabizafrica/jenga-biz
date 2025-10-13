@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Zap, LogOut, User, ChartBar as BarChart3, LogIn } from 'lucide-react';
+import { FileText, Zap, LogOut, User, ChartBar as BarChart3, LogIn, ShieldCheck } from 'lucide-react';
 import { useRoles } from '@/hooks/useRoles';
 import { useAuth } from '@/hooks/useAuth';
 import { useStrategy } from '@/hooks/useStrategy';
@@ -11,10 +11,14 @@ import { EnhancedAuthDialog } from '@/components/auth/EnhancedAuthDialog';
 import { ApprovalStatusBanner } from '@/components/ApprovalStatusBanner';
 
 const RoleAwareSaaSButton = () => {
-  const { roles } = useRoles();
+  const { roles, loading } = useRoles();
   const navigate = useNavigate();
+  
+  if (loading) return null;
+  
   const canSee = roles.includes('super_admin') || roles.includes('admin') || roles.includes('hub_manager');
   if (!canSee) return null;
+  
   return (
     <Button
       variant="outline"
@@ -29,9 +33,12 @@ const RoleAwareSaaSButton = () => {
 };
 
 const RoleAwareSuperAdminButton = () => {
-  const { roles } = useRoles();
+  const { roles, loading } = useRoles();
   const navigate = useNavigate();
+  
+  if (loading) return null;
   if (!roles.includes('super_admin')) return null;
+  
   return (
     <Button
       variant="outline"
@@ -39,7 +46,7 @@ const RoleAwareSuperAdminButton = () => {
       onClick={() => navigate('/super-admin')}
       className="flex items-center gap-2 text-xs sm:text-sm"
     >
-      <BarChart3 className="w-4 h-4" />
+      <ShieldCheck className="w-4 h-4" />
       Super Admin
     </Button>
   );
