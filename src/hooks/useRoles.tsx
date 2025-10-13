@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { apiClient } from '@/lib/api-client';
+import { supabase } from '@/integrations/supabase/client';
 
 export type UserRole = 'entrepreneur' | 'hub_manager' | 'admin' | 'super_admin';
 
@@ -18,12 +18,15 @@ export function useRoles() {
       }
       setLoading(true);
       try {
-        const profile = await apiClient.getProfile();
-        if (profile?.roles) {
-          setRoles(profile.roles as UserRole[]);
-        } else {
-          setRoles([]);
-        }
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+
+        const userRoles = (data || []).map((r: any) => r.role) as UserRole[];
+        setRoles(userRoles);
       } catch (error) {
         console.error('Failed to load user roles:', error);
         setRoles([]);
