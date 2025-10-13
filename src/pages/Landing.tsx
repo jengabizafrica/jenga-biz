@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EnhancedAuthDialog } from '@/components/auth/EnhancedAuthDialog';
@@ -54,6 +54,18 @@ const Landing = () => {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+
+  // Check for password reset tokens and redirect to reset page
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    
+    // If recovery tokens are present, redirect to password reset page
+    if (accessToken && type === 'recovery') {
+      navigate('/reset-password' + window.location.hash);
+    }
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-orange-50">
