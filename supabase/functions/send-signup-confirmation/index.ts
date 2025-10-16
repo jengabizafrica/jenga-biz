@@ -19,6 +19,10 @@ const corsHeaders = {
 
 interface SignupEmailRequest {
   email: string;
+  token_hash?: string;
+  token?: string;
+  email_action_type?: string;
+  redirect_to?: string;
   confirmationUrl?: string;
   subject?: string;
   text?: string;
@@ -51,7 +55,20 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const email = body.email;
-    const confirmationUrl = body.confirmationUrl || "";
+    const tokenHash = body.token_hash;
+    const token = body.token;
+    const siteUrl = Deno.env.get("SITE_CONFIRMATION_URL") || "https://jengabiz.africa";
+    
+    // Build confirmation URL using token_hash for secure PKCE flow
+    let confirmationUrl: string;
+    if (tokenHash) {
+      confirmationUrl = `${siteUrl}/confirm-email?token_hash=${encodeURIComponent(tokenHash)}&type=signup`;
+    } else if (body.confirmationUrl) {
+      confirmationUrl = body.confirmationUrl;
+    } else {
+      confirmationUrl = `${siteUrl}/confirm-email`;
+    }
+
     const subject = body.subject ||
       "Welcome to Jenga Biz Africa - Confirm Your Email";
     const text = body.text ||

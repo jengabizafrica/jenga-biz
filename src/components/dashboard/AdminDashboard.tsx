@@ -433,79 +433,107 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
 
           {isSuperAdmin && (
             <TabsContent value="settings" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>System Settings</CardTitle>
-                  <CardDescription>
-                    Configure system-wide settings and preferences
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6">
-                    {/* Auto-approve Organizations */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-medium">Auto-approve Organization Accounts</h3>
-                        <p className="text-sm text-muted-foreground">When enabled, newly registered ecosystem enablers will be activated automatically.</p>
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>System Settings</CardTitle>
+                    <CardDescription>
+                      Configure system-wide settings and preferences
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      {/* Auto-approve Organizations */}
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Auto-approve Organization Accounts</Label>
+                          <p className="text-sm text-muted-foreground">
+                            When enabled, newly registered ecosystem enablers will be activated automatically.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={autoApproveOrgs}
+                          onCheckedChange={setAutoApproveOrgs}
+                          disabled={settingsLoading}
+                        />
                       </div>
-                      <Switch
-                        checked={autoApproveOrgs}
-                        onCheckedChange={(val: any) => setAutoApproveOrgs(!!val)}
-                        disabled={!isSuperAdmin || settingsLoading}
-                      />
-                    </div>
 
-                    {/* Maintenance Mode */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-medium">Maintenance Mode</h3>
-                        <p className="text-sm text-muted-foreground">When enabled, bypasses all subscription gating for end users.</p>
+                      {/* Maintenance Mode */}
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Maintenance Mode</Label>
+                          <p className="text-sm text-muted-foreground">
+                            When enabled, bypasses all subscription gating for end users.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={maintenanceMode}
+                          onCheckedChange={setMaintenanceMode}
+                          disabled={settingsLoading}
+                        />
                       </div>
-                      <Switch
-                        checked={maintenanceMode}
-                        onCheckedChange={(val: any) => setMaintenanceMode(!!val)}
-                        disabled={!isSuperAdmin || settingsLoading}
-                      />
-                    </div>
 
-                    {/* Allowed Currencies */}
-                    <div className="space-y-2">
-                      <Label htmlFor="currencies">Allowed Currencies</Label>
-                      <Input
-                        id="currencies"
-                        value={allowedCurrencies.join(', ')}
-                        onChange={(e) => setAllowedCurrencies(e.target.value.split(',').map(c => c.trim()).filter(Boolean))}
-                        placeholder="USD, KES, EUR, GBP"
-                        disabled={!isSuperAdmin || settingsLoading}
-                      />
-                      <p className="text-xs text-muted-foreground">Comma-separated currency codes</p>
-                    </div>
+                      {/* Allowed Currencies */}
+                      <div className="space-y-2">
+                        <Label htmlFor="currencies">Allowed Currencies</Label>
+                        <Input
+                          id="currencies"
+                          value={allowedCurrencies.join(', ')}
+                          onChange={(e) =>
+                            setAllowedCurrencies(
+                              e.target.value
+                                .split(',')
+                                .map((c) => c.trim().toUpperCase())
+                                .filter(Boolean)
+                            )
+                          }
+                          placeholder="USD, KES, EUR, GBP"
+                          disabled={settingsLoading}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Comma-separated currency codes (e.g., USD, KES, EUR, GBP, ZAR, NGN)
+                        </p>
+                      </div>
 
-                    {/* Paystack Webhook URL */}
-                    <div className="space-y-2">
-                      <Label htmlFor="webhook">Paystack Webhook URL</Label>
-                      <Input
-                        id="webhook"
-                        value={paystackWebhookUrl}
-                        onChange={(e) => setPaystackWebhookUrl(e.target.value)}
-                        placeholder="https://..."
-                        disabled={!isSuperAdmin || settingsLoading}
-                      />
-                      <p className="text-xs text-muted-foreground">Update when switching from sandbox to live environment</p>
-                    </div>
+                      {/* Paystack Webhook URL */}
+                      <div className="space-y-2">
+                        <Label htmlFor="webhook">Paystack Webhook URL</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="webhook"
+                            value={paystackWebhookUrl}
+                            onChange={(e) => setPaystackWebhookUrl(e.target.value)}
+                            placeholder="https://..."
+                            disabled={settingsLoading}
+                            className="flex-1 font-mono text-xs"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(paystackWebhookUrl);
+                              toast({ title: 'Copied!', description: 'Webhook URL copied to clipboard' });
+                            }}
+                            disabled={!paystackWebhookUrl}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Configure this URL in Paystack dashboard. Update when switching from sandbox to live.
+                        </p>
+                      </div>
 
-                    {/* Save Button */}
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={saveSettings}
-                        disabled={!isSuperAdmin || settingsLoading}
-                      >
-                        {settingsLoading ? 'Saving...' : 'Save All Settings'}
-                      </Button>
+                      {/* Save Button */}
+                      <div className="flex gap-2 pt-4">
+                        <Button onClick={saveSettings} disabled={settingsLoading}>
+                          {settingsLoading ? 'Saving...' : 'Save All Settings'}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           )}
 

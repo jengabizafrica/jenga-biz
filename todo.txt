@@ -18,7 +18,7 @@ to do: b2c
 ✅ custom email confirmation with Brevo (token_hash flow)
 ✅ organization approval flow blocking interaction
 user financial records aggregation edge functions debug
-paystack webhook flow and testing
+paystack webhook testing with live transactions
 
 
 to do: general

@@ -3,7 +3,7 @@ project_id = "diclwatocrixibjpajuf"
 [auth]
 enabled = true
 site_url = "https://jenga-biz.vercel.app"
-additional_redirect_urls = ["https://jenga-biz.vercel.app/auth", "https://jenga-biz.vercel.app/reset-password"]
+additional_redirect_urls = ["https://jenga-biz.vercel.app/auth", "https://jenga-biz.vercel.app/reset-password", "https://jenga-biz.vercel.app/confirm-email"]
 
 [auth.email]
 enable_confirmations = true
@@ -13,5 +13,10 @@ verify_jwt = false
 
 [functions.send-signup-confirmation]
 verify_jwt = false
+
 [functions.send-invite-confirmation]
 verify_jwt = false
+
+[functions.confirm-email]
+verify_jwt = false
+

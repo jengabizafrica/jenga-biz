@@ -1569,6 +1569,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      set_system_setting: {
+        Args: { p_key: string; p_reason?: string; p_value: string }
+        Returns: boolean
+      }
       set_user_role: {
         Args: {
           hub_id?: string
