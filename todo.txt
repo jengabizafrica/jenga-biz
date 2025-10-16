@@ -9,8 +9,15 @@ admin dash obfuscation for hub man
 milestone and strat hubid scoping
 
 to do: b2c
+✅ subscription billing cycles (monthly/quarterly/yearly)
+✅ free tier auto-assignment on signup
+✅ subscription feature gating (Free/Essential/Pro)
+✅ maintenance mode for bypassing subscription checks
+✅ multi-currency support and app settings
+✅ paystack webhook URL management in settings
+✅ custom email confirmation with Brevo (token_hash flow)
+✅ organization approval flow blocking interaction
 user financial records aggregation edge functions debug
-subscription gating
 paystack webhook flow and testing
 
 

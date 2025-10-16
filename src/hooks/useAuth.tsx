@@ -47,13 +47,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, fullName: string, accountType?: string, inviteCode?: string) => {
     const at = String(accountType || '').toLowerCase();
     const normalized = ['organization','ecosystem enabler','enabler','org'].includes(at) ? 'organization' : 'business';
-    const redirectUrl = `${window.location.origin}/`;
+    const confirmUrl = `${window.location.origin}/confirm-email`;
     
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
+        emailRedirectTo: confirmUrl,
         data: {
           full_name: fullName,
           account_type: normalized,

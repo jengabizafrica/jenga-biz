@@ -320,6 +320,7 @@ async function initiatePaystack(req: Request): Promise<Response> {
     metadata: {
       user_id: user.id,
       plan_id,
+      billing_cycle: plan.billing_cycle || 'monthly',
       source: "jenga-biz",
     },
   } as Record<string, unknown>;
@@ -385,38 +386,47 @@ async function paystackWebhook(req: Request): Promise<Response> {
     const metadata = evt?.data?.metadata || {};
     const user_id: string | undefined = metadata.user_id;
     const plan_id: string | undefined = metadata.plan_id;
+    const billing_cycle: string | undefined = metadata.billing_cycle;
 
     if (user_id && plan_id) {
       const service = getServiceRoleClient();
       const now = new Date();
-      const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      
+      // Calculate period end based on billing cycle
+      let periodEnd: Date;
+      if (billing_cycle === 'yearly') {
+        periodEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+      } else if (billing_cycle === 'quarterly') {
+        periodEnd = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+      } else {
+        // Default to monthly
+        periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
 
       // Ensure plan is active
       const { data: plan, error: planErr } = await service
         .from("subscription_plans")
-        .select("id, is_active")
+        .select("id, is_active, billing_cycle")
         .eq("id", plan_id)
         .eq("is_active", true)
         .maybeSingle();
       if (!planErr && plan) {
-        // Check if user already has an active subscription for this plan
-        const { data: existing, error: selErr } = await service
+        // Deactivate existing active subscriptions for this user
+        await service
           .from("user_subscriptions")
-          .select("id")
+          .update({ status: "inactive" })
           .eq("user_id", user_id)
-          .eq("plan_id", plan_id)
-          .eq("status", "active")
-          .gt("current_period_end", now.toISOString());
+          .eq("status", "active");
 
-        if (!selErr && (!existing || existing.length === 0)) {
-          await service.from("user_subscriptions").insert({
-            user_id,
-            plan_id,
-            status: "active",
-            current_period_start: now.toISOString(),
-            current_period_end: periodEnd.toISOString(),
-          });
-        }
+        // Create new active subscription
+        await service.from("user_subscriptions").insert({
+          user_id,
+          plan_id,
+          status: "active",
+          current_period_start: now.toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          paystack_subscription_id: evt?.data?.reference || null,
+        });
       }
     }
   }

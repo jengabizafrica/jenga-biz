@@ -5,12 +5,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ApprovalBlocker } from "@/components/ApprovalBlocker";
 import ImpersonationBanner from '@/components/ImpersonationBanner';
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 // Auth page removed - use EnhancedAuthDialog in pages
 import NotFound from "./pages/NotFound";
 import PasswordReset from "./pages/PasswordReset";
+import EmailConfirmation from "./pages/EmailConfirmation";
 import Register from './pages/Register';
 import Templates from "./pages/Templates";
 import Strategy from "./pages/Strategy";
@@ -42,11 +44,13 @@ const App = () => (
         <BrowserRouter>
           <ServiceWorkerUpdater />
           <HubContextProvider>
-            <ImpersonationBanner />
-            <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/reset-password" element={<PasswordReset />} />
-                <Route path="/register" element={<Register />} />
+            <ApprovalBlocker>
+              <ImpersonationBanner />
+              <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/reset-password" element={<PasswordReset />} />
+                  <Route path="/confirm-email" element={<EmailConfirmation />} />
+                  <Route path="/register" element={<Register />} />
                 <Route path="/templates" element={<ProtectedRoute allowedRoles={["entrepreneur","hub_manager","admin","super_admin"]}><Templates /></ProtectedRoute>} />
                 <Route path="/strategy" element={<ProtectedRoute allowedRoles={["entrepreneur","hub_manager","admin","super_admin"]}><Strategy /></ProtectedRoute>} />
                 <Route path="/strategies" element={<ProtectedRoute allowedRoles={["entrepreneur","hub_manager","admin","super_admin"]}><Strategy /></ProtectedRoute>} />
@@ -61,6 +65,7 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
             </Routes>
+            </ApprovalBlocker>
           </HubContextProvider>
         </BrowserRouter>
       </TooltipProvider>

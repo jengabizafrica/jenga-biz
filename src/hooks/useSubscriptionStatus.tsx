@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api-client';
 
@@ -75,24 +75,50 @@ export function useSubscriptionStatus() {
   const isPro = subscription.plan?.name?.toLowerCase() === 'pro';
   const isFree = !hasActiveSubscription || subscription.plan?.name?.toLowerCase() === 'free';
 
-  // TEMPORARY: Allow all features regardless of subscription
-  // TODO: Implement proper subscription gating when ready
-  const canAccessFeature = (feature: string) => {
-    // Keep all subscription logic in place but always return true
-    // This allows us to easily restore the gating later
-    const hasAccess = true;
+  const canAccessFeature = useCallback((requiredTier: 'free' | 'essential' | 'pro') => {
+    // Check maintenance mode first - bypasses all gating
+    const maintenanceMode = sessionStorage.getItem('maintenance_mode') === 'true';
+    if (maintenanceMode) {
+      console.log('[Subscription] Maintenance mode active - bypassing subscription check');
+      return true;
+    }
+
+    const planName = subscription.plan?.name?.toLowerCase() || '';
     
-    // Log the feature check for debugging
+    // Free tier: base access
+    if (requiredTier === 'free') return true;
+    
+    // Check trial period for Free tier
+    if (planName === 'free' && subscription.currentPeriodEnd) {
+      const trialEnd = new Date(subscription.currentPeriodEnd);
+      const isInTrial = trialEnd > new Date();
+      if (isInTrial) {
+        console.log('[Subscription] Free tier in trial period - full access');
+        return true;
+      }
+    }
+    
+    // Essential tier requirements
+    if (requiredTier === 'essential') {
+      return planName === 'essential' || planName === 'pro' || hasActiveSubscription;
+    }
+    
+    // Pro tier requirements
+    if (requiredTier === 'pro') {
+      return planName === 'pro' || hasActiveSubscription;
+    }
+    
+    // Log access in development
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[Subscription] Feature '${feature}' access:`, {
-        hasAccess,
+      console.log(`[Subscription] Feature '${requiredTier}' access:`, {
+        hasAccess: false,
         subscriptionStatus: subscription.status,
         plan: subscription.plan?.name || 'none'
       });
     }
     
-    return hasAccess;
-  };
+    return false;
+  }, [subscription, hasActiveSubscription]);
 
   return {
     ...subscription,

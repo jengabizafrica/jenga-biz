@@ -19,6 +19,8 @@ import { InviteCodeManager } from "../auth/InviteCodeManager";
 import { UserManagement } from "./UserManagement";
 import { HubsList } from './HubsList';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { PendingApprovalsList } from '../admin/PendingApprovalsList';
 import { SubscriptionPlansManager } from '../admin/SubscriptionPlansManager';
@@ -38,16 +40,44 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
 
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
   const [autoApproveOrgs, setAutoApproveOrgs] = useState<boolean>(false);
-  const { getAutoApprove, setAutoApprove, loading: settingsLoading, error: settingsError } = useAppSettings();
+  const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false);
+  const [allowedCurrencies, setAllowedCurrencies] = useState<string[]>([]);
+  const [paystackWebhookUrl, setPaystackWebhookUrl] = useState<string>('');
+  const { 
+    getAutoApprove, 
+    setAutoApprove, 
+    getMaintenanceMode, 
+    setMaintenanceMode: saveMaintenanceMode,
+    getAllowedCurrencies,
+    setAllowedCurrencies: saveAllowedCurrencies,
+    getPaystackWebhookUrl,
+    setPaystackWebhookUrl: savePaystackWebhookUrl,
+    loading: settingsLoading, 
+    error: settingsError 
+  } = useAppSettings();
 
   const loadSettings = async () => {
-    const value = await getAutoApprove();
-    setAutoApproveOrgs(value);
+    const [autoApprove, maintenance, currencies, webhookUrl] = await Promise.all([
+      getAutoApprove(),
+      getMaintenanceMode(),
+      getAllowedCurrencies(),
+      getPaystackWebhookUrl(),
+    ]);
+    setAutoApproveOrgs(autoApprove);
+    setMaintenanceMode(maintenance);
+    setAllowedCurrencies(currencies);
+    setPaystackWebhookUrl(webhookUrl);
   };
 
   const saveSettings = async () => {
-    const success = await setAutoApprove(autoApproveOrgs);
-    if (success) {
+    const [s1, s2, s3, s4] = await Promise.all([
+      setAutoApprove(autoApproveOrgs),
+      saveMaintenanceMode(maintenanceMode),
+      saveAllowedCurrencies(allowedCurrencies),
+      savePaystackWebhookUrl(paystackWebhookUrl),
+    ]);
+    
+    if (s1 && s2 && s3 && s4) {
       toast({ title: 'Settings saved', description: 'System settings updated successfully.' });
     } else if (settingsError) {
       toast({ title: 'Save failed', description: settingsError, variant: 'destructive' });
@@ -411,30 +441,67 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4">
+                  <div className="grid gap-6">
+                    {/* Auto-approve Organizations */}
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-sm font-medium">Auto-approve Organization Accounts</h3>
-                        <p className="text-sm text-muted-foreground">When enabled, newly registered ecosystem enablers will be activated automatically. Otherwise, they will remain pending approval.</p>
+                        <p className="text-sm text-muted-foreground">When enabled, newly registered ecosystem enablers will be activated automatically.</p>
                       </div>
-                      <div>
-                        {/* Switch */}
-                        <Switch
-                          checked={autoApproveOrgs}
-                          onCheckedChange={(val: any) => setAutoApproveOrgs(!!val)}
-                          disabled={!isSuperAdmin || settingsLoading}
-                        />
-                      </div>
+                      <Switch
+                        checked={autoApproveOrgs}
+                        onCheckedChange={(val: any) => setAutoApproveOrgs(!!val)}
+                        disabled={!isSuperAdmin || settingsLoading}
+                      />
                     </div>
-                    <div>
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          onClick={saveSettings}
-                          disabled={!isSuperAdmin || settingsLoading}
-                        >
-                          {settingsLoading ? 'Saving...' : 'Save'}
-                        </Button>
+
+                    {/* Maintenance Mode */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-medium">Maintenance Mode</h3>
+                        <p className="text-sm text-muted-foreground">When enabled, bypasses all subscription gating for end users.</p>
                       </div>
+                      <Switch
+                        checked={maintenanceMode}
+                        onCheckedChange={(val: any) => setMaintenanceMode(!!val)}
+                        disabled={!isSuperAdmin || settingsLoading}
+                      />
+                    </div>
+
+                    {/* Allowed Currencies */}
+                    <div className="space-y-2">
+                      <Label htmlFor="currencies">Allowed Currencies</Label>
+                      <Input
+                        id="currencies"
+                        value={allowedCurrencies.join(', ')}
+                        onChange={(e) => setAllowedCurrencies(e.target.value.split(',').map(c => c.trim()).filter(Boolean))}
+                        placeholder="USD, KES, EUR, GBP"
+                        disabled={!isSuperAdmin || settingsLoading}
+                      />
+                      <p className="text-xs text-muted-foreground">Comma-separated currency codes</p>
+                    </div>
+
+                    {/* Paystack Webhook URL */}
+                    <div className="space-y-2">
+                      <Label htmlFor="webhook">Paystack Webhook URL</Label>
+                      <Input
+                        id="webhook"
+                        value={paystackWebhookUrl}
+                        onChange={(e) => setPaystackWebhookUrl(e.target.value)}
+                        placeholder="https://..."
+                        disabled={!isSuperAdmin || settingsLoading}
+                      />
+                      <p className="text-xs text-muted-foreground">Update when switching from sandbox to live environment</p>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={saveSettings}
+                        disabled={!isSuperAdmin || settingsLoading}
+                      >
+                        {settingsLoading ? 'Saving...' : 'Save All Settings'}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

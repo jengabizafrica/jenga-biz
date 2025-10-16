@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 
 interface SubscriptionGateProps {
   children: React.ReactNode;
-  requiredTier: 'free' | 'pro' | 'premium';
+  requiredTier: 'free' | 'essential' | 'pro';
   feature: string;
   fallback?: React.ReactNode;
   showUpgradePrompt?: boolean;
@@ -104,17 +104,17 @@ export function SubscriptionGate({
 }
 
 // Convenience components for common use cases
-export function ProFeature({ children, feature, fallback }: Omit<SubscriptionGateProps, 'requiredTier'>) {
+export function EssentialFeature({ children, feature, fallback }: Omit<SubscriptionGateProps, 'requiredTier'>) {
   return (
-    <SubscriptionGate requiredTier="pro" feature={feature} fallback={fallback}>
+    <SubscriptionGate requiredTier="essential" feature={feature} fallback={fallback}>
       {children}
     </SubscriptionGate>
   );
 }
 
-export function PremiumFeature({ children, feature, fallback }: Omit<SubscriptionGateProps, 'requiredTier'>) {
+export function ProFeature({ children, feature, fallback }: Omit<SubscriptionGateProps, 'requiredTier'>) {
   return (
-    <SubscriptionGate requiredTier="premium" feature={feature} fallback={fallback}>
+    <SubscriptionGate requiredTier="pro" feature={feature} fallback={fallback}>
       {children}
     </SubscriptionGate>
   );

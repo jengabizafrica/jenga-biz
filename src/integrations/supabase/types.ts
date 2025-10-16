@@ -880,6 +880,8 @@ export type Database = {
           country: string | null
           created_at: string
           email: string | null
+          email_confirmed: boolean | null
+          email_confirmed_at: string | null
           first_name: string | null
           full_name: string | null
           hub_id: string | null
@@ -903,6 +905,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed?: boolean | null
+          email_confirmed_at?: string | null
           first_name?: string | null
           full_name?: string | null
           hub_id?: string | null
@@ -926,6 +930,8 @@ export type Database = {
           country?: string | null
           created_at?: string
           email?: string | null
+          email_confirmed?: boolean | null
+          email_confirmed_at?: string | null
           first_name?: string | null
           full_name?: string | null
           hub_id?: string | null
@@ -1510,6 +1516,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      is_org_approved: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       is_super_admin: {
         Args: { user_id: string }
         Returns: boolean
@@ -1583,6 +1593,10 @@ export type Database = {
       update_geographic_analytics: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      user_can_interact: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
     }
     Enums: {
