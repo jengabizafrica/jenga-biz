@@ -322,7 +322,12 @@ export const useStrategy = () => {
 
     // Set new timeout for auto-save
     autoSaveTimeoutRef.current = setTimeout(() => {
-      saveStrategy(strategyData, { showToast: false }); // Don't show toast for auto-save
+      // Convert null to undefined for business_id to match the expected type
+      const cleanedData = {
+        ...strategyData,
+        business_id: strategyData.business_id ?? undefined
+      };
+      saveStrategy(cleanedData as any, { showToast: false }); // Don't show toast for auto-save
     }, 1000); // 1 second debounce
   }, [user, saveStrategy]);
 
