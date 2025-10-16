@@ -33,6 +33,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useShareActions } from '@/lib/shareUtils';
 import { formatError } from '@/lib/formatError';
 import ReportModal from './ReportModal';
+import { useFinancialSummary } from '@/hooks/useEdgeFinancial';
 
 interface UserDashboardProps {
   // No props needed - using React Router navigation
@@ -117,9 +118,17 @@ const UserDashboard = ({ }: UserDashboardProps) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [allMilestones, setAllMilestones] = useState<any[]>([]);
-    const [, setLoadingMilestones] = useState(true);
-    const [, setLoadingFinancial] = useState(true);
-  const [financialData, setFinancialData] = useState<any>({ totalRevenue: 0, totalExpenses: 0, recentTransactions: [] });
+  const [, setLoadingMilestones] = useState(true);
+  
+  // Use edge function for financial data
+  const { 
+    data: financialSummary, 
+    isLoading: financialLoading, 
+    error: financialError,
+    refetch: refetchFinancials 
+  } = useFinancialSummary({
+    currency: profile?.country === 'KE' ? 'KES' : 'USD',
+  });
   
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportMode, setReportMode] = useState<'download' | 'share'>('download');
@@ -274,7 +283,6 @@ const UserDashboard = ({ }: UserDashboardProps) => {
     // Also fetch a fallback list of strategies (including business) in case the hook/context hasn't populated yet
     fetchFallbackStrategiesIfNeeded();
     loadUserMilestones();
-    loadUserFinancialData();
   }, [user]);
 
   // Fallback: directly query strategies including business relation if strategies from hook are empty
@@ -361,88 +369,17 @@ const UserDashboard = ({ }: UserDashboardProps) => {
     }
   };
 
-  const loadUserFinancialData = async () => {
-    if (!user) return;
-
-    try {
-      setLoadingFinancial(true);
-      console.log('Loading financial data for user:', user.id);
-      // First attempt: use aggregated `financial_records` (business-level daily snapshots)
-      // Fetch user's strategies to map to business_id(s)
-      const { data: userStrategies, error: stratErr } = await supabase
-        .from('strategies')
-        .select('id, business_id')
-        .eq('user_id', user.id);
-
-      let businessIds: string[] = [];
-      if (!stratErr && userStrategies && userStrategies.length > 0) {
-        businessIds = userStrategies.map((s: any) => s.business_id).filter(Boolean);
-      }
-
-      if (businessIds.length > 0) {
-        try {
-          // Query financial_records for these businesses
-          const { data: frData, error: frError } = await supabase
-            .from('financial_records')
-            .select('business_id, revenue, expenses, metric_type, record_date')
-            .in('business_id', businessIds)
-            .not('revenue', 'is', null);
-
-          if (!frError && frData && frData.length > 0) {
-            // Aggregate totals using revenue/expenses columns when available
-            const totalRevenue = frData.reduce((sum: number, r: any) => sum + Number(r.revenue || 0), 0);
-            const totalExpenses = frData.reduce((sum: number, r: any) => sum + Number(r.expenses || 0), 0);
-
-            // Recent transactions: fall back to the most recent financial_transactions for listing, since records are daily aggregates
-            const { data: recentTx, error: rtErr } = await supabase
-              .from('financial_transactions')
-              .select('*')
-              .eq('user_id', user.id)
-              .order('transaction_date', { ascending: false })
-              .limit(5);
-
-            setFinancialData({
-              totalRevenue,
-              totalExpenses,
-              netProfit: totalRevenue - totalExpenses,
-              recentTransactions: (!rtErr && recentTx) ? recentTx : []
-            });
-            return;
-          }
-        } catch (err) {
-          console.warn('Error querying financial_records, will fall back to transactions', err);
-        }
-      }
-
-      // Fallback: query financial_transactions directly (per-user)
-      const { data, error } = await supabase
-        .from('financial_transactions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('transaction_date', { ascending: false });
-
-      if (error) throw error;
-
-      console.log('Loaded financial transactions (fallback):', data);
-
-      const totalRevenue = data?.filter(t => t.transaction_type === 'income').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const totalExpenses = data?.filter(t => t.transaction_type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const recentTransactions = data?.slice(0, 5) || [];
-
-      setFinancialData({
-        totalRevenue,
-        totalExpenses,
-        netProfit: totalRevenue - totalExpenses,
-        recentTransactions
+  // Financial data is now handled by useFinancialSummary hook
+  // Show error toast if financial data fetch fails
+  useEffect(() => {
+    if (financialError) {
+      toast({ 
+        title: 'Failed to load financial data', 
+        description: 'Unable to fetch financial summary. Please try again.', 
+        variant: 'destructive' 
       });
-    } catch (error: any) {
-      const msg = formatError(error);
-      console.error('Error loading financial data:', msg, error);
-      toast({ title: 'Failed to load financial data', description: msg, variant: 'destructive' });
-    } finally {
-      setLoadingFinancial(false);
     }
-  };
+  }, [financialError, toast]);
 
   const getUserDisplayName = () => {
     if (!profile) return 'User';
@@ -562,27 +499,34 @@ const UserDashboard = ({ }: UserDashboardProps) => {
     // Add financial section
     report += `FINANCIAL SUMMARY\n`;
     report += `${'-'.repeat(30)}\n`;
-  const totalRevenue = financialData?.totalRevenue ?? 0;
-  const totalExpenses = financialData?.totalExpenses ?? 0;
-  const netProfit = financialData?.netProfit ?? (totalRevenue - totalExpenses);
-  const recentTransactions = financialData?.recentTransactions ?? [];
+    const totalRevenue = financialSummary?.totals?.income ?? 0;
+    const totalExpenses = financialSummary?.totals?.expenses ?? 0;
+    const netProfit = financialSummary?.totals?.netProfit ?? (totalRevenue - totalExpenses);
+    const transactionCount = financialSummary?.transactionCounts?.total ?? 0;
 
-  report += `Total Revenue: KSh ${Number(totalRevenue).toLocaleString()}\n`;
-  report += `Total Expenses: KSh ${Number(totalExpenses).toLocaleString()}\n`;
-  report += `Net Profit: KSh ${Number(netProfit).toLocaleString()}\n`;
-  report += `Recent Transactions: ${recentTransactions.length}\n\n`;
+    report += `Total Revenue: KSh ${Number(totalRevenue).toLocaleString()}\n`;
+    report += `Total Expenses: KSh ${Number(totalExpenses).toLocaleString()}\n`;
+    report += `Net Profit: KSh ${Number(netProfit).toLocaleString()}\n`;
+    report += `Profit Margin: ${Number(financialSummary?.totals?.profitMargin ?? 0).toFixed(2)}%\n`;
+    report += `Total Transactions: ${transactionCount}\n\n`;
 
-    if ((recentTransactions || []).length > 0) {
-      report += `RECENT TRANSACTIONS (Last 5)\n`;
+    // Category breakdowns
+    if (financialSummary?.breakdown?.incomeByCategory && Object.keys(financialSummary.breakdown.incomeByCategory).length > 0) {
+      report += `INCOME BY CATEGORY\n`;
       report += `${'-'.repeat(30)}\n`;
-      (recentTransactions || []).forEach((transaction: any, index: number) => {
-        report += `${index + 1}. ${transaction.description || 'No description'}\n`;
-        report += `   Type: ${transaction.transaction_type || 'unknown'}\n`;
-        report += `   Amount: KSh ${Number(transaction.amount || 0).toLocaleString()}\n`;
-        report += `   Category: ${transaction.category || 'Uncategorized'}\n`;
-        const td = safeParseDate(transaction.transaction_date);
-        report += `   Date: ${td ? td.toLocaleDateString() : 'Unknown'}\n\n`;
+      Object.entries(financialSummary.breakdown.incomeByCategory).forEach(([category, amount]) => {
+        report += `${category}: KSh ${Number(amount).toLocaleString()}\n`;
       });
+      report += `\n`;
+    }
+
+    if (financialSummary?.breakdown?.expensesByCategory && Object.keys(financialSummary.breakdown.expensesByCategory).length > 0) {
+      report += `EXPENSES BY CATEGORY\n`;
+      report += `${'-'.repeat(30)}\n`;
+      Object.entries(financialSummary.breakdown.expensesByCategory).forEach(([category, amount]) => {
+        report += `${category}: KSh ${Number(amount).toLocaleString()}\n`;
+      });
+      report += `\n`;
     }
 
     report += `\n${'='.repeat(60)}\n`;
@@ -823,6 +767,61 @@ const UserDashboard = ({ }: UserDashboardProps) => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
+
+        {/* Financial Summary Section */}
+        <div className="mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  Financial Summary
+                </span>
+                {!financialLoading && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => refetchFinancials()}
+                    className="text-xs"
+                  >
+                    Refresh
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {financialLoading ? (
+                <div className="text-center py-4 text-gray-500">Loading financial data...</div>
+              ) : financialError ? (
+                <div className="text-center py-4 text-red-500">Failed to load financial data</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-1">Total Income</div>
+                    <div className="text-2xl font-bold text-green-700">
+                      KSh {Number(financialSummary?.totals?.income ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-red-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-1">Total Expenses</div>
+                    <div className="text-2xl font-bold text-red-700">
+                      KSh {Number(financialSummary?.totals?.expenses ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-1">Net Profit</div>
+                    <div className="text-2xl font-bold text-blue-700">
+                      KSh {Number(financialSummary?.totals?.netProfit ?? 0).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Margin: {Number(financialSummary?.totals?.profitMargin ?? 0).toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Strategies Overview */}
         <div className="mb-8">
