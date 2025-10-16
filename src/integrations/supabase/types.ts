@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -110,7 +109,6 @@ export type Database = {
           },
         ]
       }
-      
       business_progress_stages: {
         Row: {
           completed_at: string | null
@@ -201,6 +199,45 @@ export type Database = {
         }
         Relationships: []
       }
+      business_templates: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          template_config: Json
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          template_config: Json
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          template_config?: Json
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       businesses: {
         Row: {
           business_type: string | null
@@ -210,6 +247,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
+          registration_certificate_url: string | null
           registration_number: string | null
           stage: Database["public"]["Enums"]["business_stage"] | null
           updated_at: string
@@ -223,6 +261,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
+          registration_certificate_url?: string | null
           registration_number?: string | null
           stage?: Database["public"]["Enums"]["business_stage"] | null
           updated_at?: string
@@ -236,6 +275,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+          registration_certificate_url?: string | null
           registration_number?: string | null
           stage?: Database["public"]["Enums"]["business_stage"] | null
           updated_at?: string
@@ -310,39 +350,36 @@ export type Database = {
       }
       financial_records: {
         Row: {
-          id: string
-          business_id: string
-          record_date: string
           amount: number
-          revenue: number
-          expenses: number
+          business_id: string
+          created_at: string
+          hub_id: string | null
+          id: string
           metric_type: string
           notes: string | null
-          created_at: string
+          record_date: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          business_id: string
-          record_date: string
           amount?: number
-          revenue?: number
-          expenses?: number
+          business_id: string
+          created_at?: string
+          hub_id?: string | null
+          id?: string
           metric_type?: string
           notes?: string | null
-          created_at?: string
+          record_date: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          business_id?: string
-          record_date?: string
           amount?: number
-          revenue?: number
-          expenses?: number
+          business_id?: string
+          created_at?: string
+          hub_id?: string | null
+          id?: string
           metric_type?: string
           notes?: string | null
-          created_at?: string
+          record_date?: string
           updated_at?: string
         }
         Relationships: [
@@ -353,9 +390,15 @@ export type Database = {
             referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_financial_records_hub"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
         ]
       }
-      
       financial_transactions: {
         Row: {
           amount: number
@@ -364,7 +407,7 @@ export type Database = {
           currency: string
           description: string
           id: string
-          strategy_id: string | null
+          strategy_id: string
           transaction_date: string
           transaction_type: string
           updated_at: string
@@ -377,7 +420,7 @@ export type Database = {
           currency?: string
           description: string
           id?: string
-          strategy_id?: string | null
+          strategy_id: string
           transaction_date?: string
           transaction_type: string
           updated_at?: string
@@ -390,7 +433,7 @@ export type Database = {
           currency?: string
           description?: string
           id?: string
-          strategy_id?: string | null
+          strategy_id?: string
           transaction_date?: string
           transaction_type?: string
           updated_at?: string
@@ -514,7 +557,10 @@ export type Database = {
           code: string
           created_at: string
           created_by: string
+          deleted_at: string | null
+          deleted_by: string | null
           expires_at: string
+          hub_id: string | null
           id: string
           invited_email: string
           used_at: string | null
@@ -525,7 +571,10 @@ export type Database = {
           code: string
           created_at?: string
           created_by: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           expires_at?: string
+          hub_id?: string | null
           id?: string
           invited_email: string
           used_at?: string | null
@@ -536,13 +585,31 @@ export type Database = {
           code?: string
           created_at?: string
           created_by?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           expires_at?: string
+          hub_id?: string | null
           id?: string
           invited_email?: string
           used_at?: string | null
           used_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invite_codes_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_codes_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       job_creation_records: {
         Row: {
@@ -708,46 +775,49 @@ export type Database = {
       milestones: {
         Row: {
           business_stage: string | null
+          completed_at: string | null
           created_at: string
+          description: string | null
           id: string
+          milestone_type: string | null
           status: string | null
           strategy_id: string | null
           target_date: string | null
           title: string
-          completed_at: string | null
-          milestone_type: Database["public"]["Enums"]["milestone_type"] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           business_stage?: string | null
+          completed_at?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          milestone_type?: string | null
           status?: string | null
           strategy_id?: string | null
           target_date?: string | null
           title: string
-          completed_at?: string | null
-          milestone_type?: Database["public"]["Enums"]["milestone_type"] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           business_stage?: string | null
+          completed_at?: string | null
           created_at?: string
+          description?: string | null
           id?: string
+          milestone_type?: string | null
           status?: string | null
           strategy_id?: string | null
           target_date?: string | null
           title?: string
-          completed_at?: string | null
-          milestone_type?: Database["public"]["Enums"]["milestone_type"] | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "milestones_strategy_id_fkey"
+            foreignKeyName: "fk_milestones_strategy_id_strategy_id_cascade"
             columns: ["strategy_id"]
             isOneToOne: false
             referencedRelation: "strategies"
@@ -812,6 +882,7 @@ export type Database = {
           email: string | null
           first_name: string | null
           full_name: string | null
+          hub_id: string | null
           id: string
           industry: string | null
           is_profile_complete: boolean | null
@@ -834,6 +905,7 @@ export type Database = {
           email?: string | null
           first_name?: string | null
           full_name?: string | null
+          hub_id?: string | null
           id: string
           industry?: string | null
           is_profile_complete?: boolean | null
@@ -856,6 +928,7 @@ export type Database = {
           email?: string | null
           first_name?: string | null
           full_name?: string | null
+          hub_id?: string | null
           id?: string
           industry?: string | null
           is_profile_complete?: boolean | null
@@ -867,7 +940,15 @@ export type Database = {
           updated_at?: string
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       role_change_audit: {
         Row: {
@@ -940,6 +1021,7 @@ export type Database = {
       }
       strategies: {
         Row: {
+          business_id: string | null
           business_name: string | null
           country: string | null
           created_at: string
@@ -962,6 +1044,7 @@ export type Database = {
           vision: string | null
         }
         Insert: {
+          business_id?: string | null
           business_name?: string | null
           country?: string | null
           created_at?: string
@@ -984,6 +1067,7 @@ export type Database = {
           vision?: string | null
         }
         Update: {
+          business_id?: string | null
           business_name?: string | null
           country?: string | null
           created_at?: string
@@ -1005,7 +1089,92 @@ export type Database = {
           value_proposition?: string | null
           vision?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "strategies_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          billing_cycle: string
+          created_at: string
+          currency: string
+          description: string | null
+          features: Json
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          billing_cycle?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          billing_cycle?: string
+          created_at?: string
+          currency?: string
+          description?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          updated_at?: string
+        }
         Relationships: []
+      }
+      template_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          permissions: Json
+          subscription_tier: string
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          permissions?: Json
+          subscription_tier: string
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          permissions?: Json
+          subscription_tier?: string
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_permissions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "business_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       template_usage_analytics: {
         Row: {
@@ -1159,18 +1328,95 @@ export type Database = {
           },
         ]
       }
+      user_subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          paystack_subscription_id: string | null
+          plan_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          paystack_subscription_id?: string | null
+          plan_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          paystack_subscription_id?: string | null
+          plan_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
-      [_ in never]: never
+      financial_records_with_hub: {
+        Row: {
+          amount: number | null
+          business_id: string | null
+          created_at: string | null
+          hub_id: string | null
+          id: string | null
+          metric_type: string | null
+          notes: string | null
+          record_date: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "businesses_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_records_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       add_user_role_with_audit: {
-        Args: {
-          new_role: Database["public"]["Enums"]["user_role"]
-          requester_ip?: unknown
-          requester_user_agent?: string
-          target_user_id: string
-        }
+        Args:
+          | {
+              hub_id?: string
+              new_role: Database["public"]["Enums"]["user_role"]
+              requester_ip?: unknown
+              requester_user_agent?: string
+              target_user_id: string
+            }
+          | {
+              new_role: Database["public"]["Enums"]["user_role"]
+              requester_ip?: unknown
+              requester_user_agent?: string
+              target_user_id: string
+            }
         Returns: boolean
       }
       analyze_drop_off_points: {
@@ -1191,6 +1437,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      batch_process_financial_aggregation: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: {
+          business_id: string
+          record_date: string
+          records_processed: number
+        }[]
+      }
       calculate_stage_completion_rates: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1201,6 +1455,22 @@ export type Database = {
           total_starts: number
         }[]
       }
+      cleanup_old_financial_aggregations: {
+        Args: { p_retention_days?: number }
+        Returns: number
+      }
+      create_or_update_strategy_with_business: {
+        Args: {
+          p_business_data?: Json
+          p_milestones_data?: Json[]
+          p_strategy_data: Json
+        }
+        Returns: Json
+      }
+      create_strategy_with_business: {
+        Args: { p_business_data: Json; p_strategy_data: Json }
+        Returns: Json
+      }
       get_current_hub_context: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1208,6 +1478,17 @@ export type Database = {
       get_hub_analytics: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      get_strategy_financials: {
+        Args: { p_strategy_id: string }
+        Returns: {
+          amount: number
+          created_at: string
+          id: string
+          record_date: string
+          strategy_id: string
+          updated_at: string
+        }[]
       }
       handle_org_signup: {
         Args: {
@@ -1243,10 +1524,28 @@ export type Database = {
         Returns: boolean
       }
       remove_user_role_with_audit: {
+        Args:
+          | {
+              hub_id?: string
+              old_role: Database["public"]["Enums"]["user_role"]
+              requester_ip?: unknown
+              requester_user_agent?: string
+              target_user_id: string
+            }
+          | {
+              old_role: Database["public"]["Enums"]["user_role"]
+              requester_ip?: unknown
+              requester_user_agent?: string
+              target_user_id: string
+            }
+        Returns: boolean
+      }
+      service_add_user_role: {
         Args: {
-          old_role: Database["public"]["Enums"]["user_role"]
+          new_role: Database["public"]["Enums"]["user_role"]
           requester_ip?: unknown
           requester_user_agent?: string
+          requester_user_id?: string
           target_user_id: string
         }
         Returns: boolean
@@ -1259,6 +1558,15 @@ export type Database = {
           setting_value: string
         }
         Returns: boolean
+      }
+      set_user_role: {
+        Args: {
+          hub_id?: string
+          requester_user_id?: string
+          role: string
+          target_user_id: string
+        }
+        Returns: undefined
       }
       setup_super_admin: {
         Args: { admin_email: string }
