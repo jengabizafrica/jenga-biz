@@ -187,6 +187,15 @@ const FinancialTracker = ({
       return;
     }
 
+    if (!strategyId) {
+      toast({
+        title: "Error",
+        description: "No strategy selected. Please select a strategy first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const fallbackCategory = newTransaction.type === 'income' ? 'Cash' : 'Operational';
     const effectiveCategory = newTransaction.category || fallbackCategory;
 
