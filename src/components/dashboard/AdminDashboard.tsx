@@ -442,7 +442,7 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
 
           {isSuperAdmin && (
             <TabsContent value="settings" className="space-y-6">
-              <div className="space-y-4">
+              <div className="space-y-4 mt-[120px] lg:mt-6">
                 <Card>
                   <CardHeader>
                     <CardTitle>System Settings</CardTitle>
