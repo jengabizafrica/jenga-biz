@@ -136,7 +136,7 @@ export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAd
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 mt-[120px] lg:mt-6">
       <div className="flex justify-between items-center">
         <div />
       </div>
