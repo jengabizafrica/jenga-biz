@@ -70,7 +70,7 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-orange-50">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10">
+      <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10 landing-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <img src="/jenga-biz-logo.png" alt="Jenga Biz Africa" className="h-10 w-auto" />
