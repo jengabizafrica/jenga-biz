@@ -42,8 +42,28 @@ const handler = async (req: Request): Promise<Response> => {
     const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
 
     if (hookSecret) {
-      if (!authHeader || authHeader !== `Bearer ${hookSecret}`) {
-        console.error("[send-signup-confirmation] Missing or invalid Authorization bearer token");
+      if (!authHeader) {
+        console.error("[send-signup-confirmation] Missing Authorization header");
+        return new Response(
+          JSON.stringify({ error: "unauthorized" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      // Extract token from "Bearer <token>" format
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      
+      // Normalize both values for comparison - handle v1,whsec_ prefix
+      const normalizeSecret = (secret: string) => {
+        return secret.startsWith('v1,whsec_') ? secret.substring(9) : secret;
+      };
+
+      const normalizedToken = normalizeSecret(token);
+      const normalizedSecret = normalizeSecret(hookSecret);
+
+      // Compare either full values or normalized values
+      if (token !== hookSecret && normalizedToken !== normalizedSecret) {
+        console.error("[send-signup-confirmation] Invalid Authorization bearer token");
         return new Response(
           JSON.stringify({ error: "unauthorized" }),
           { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
