@@ -196,14 +196,13 @@ const Landing = () => {
       <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10 landing-header">
         <div className="max-w-full sm:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 landing-wrapper">
           <div className="flex justify-between items-center py-4 max-w-full">
-            <div className="flex-0" />
+            <img
+              alt="Jenga Biz Africa"
+              loading="lazy"
+              src="/jenga-biz-logo.png"
+              className="landing-logo w-[70px] h-[70px] sm:w-auto sm:h-10 mr-1 sm:mr-0 block flex-shrink-0"
+            />
             <div className="flex items-center gap-2 overflow-auto sm:overflow-visible whitespace-nowrap landing-controls">
-              <img
-                alt="Jenga Biz Africa"
-                loading="lazy"
-                src="/jenga-biz-logo.png"
-                className="landing-logo w-[70px] h-[70px] sm:w-auto sm:h-10 mr-1 sm:mr-0 block"
-              />
               <Button
                 variant="outline"
                 size="sm"
