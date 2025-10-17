@@ -54,8 +54,14 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Set HttpOnly cookies for session
-    const cookieDomain = new URL(appUrl).hostname;
+    const hostname = new URL(appUrl).hostname;
     const isProduction = !appUrl.includes("localhost");
+    
+    // Fix domain to work with both jengabiz.africa and www.jengabiz.africa
+    const cookieDomain = hostname === "jengabiz.africa" ? ".jengabiz.africa" : hostname;
+    
+    console.log("Setting cookies for domain:", cookieDomain);
+    console.log("Access token present:", !!data.session.access_token);
     
     const accessTokenCookie = `sb-access-token=${data.session.access_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${data.session.expires_in}${isProduction ? "; Secure" : ""}; Domain=${cookieDomain}`;
     const refreshTokenCookie = `sb-refresh-token=${data.session.refresh_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${isProduction ? "; Secure" : ""}; Domain=${cookieDomain}`;
@@ -63,12 +69,17 @@ const handler = async (req: Request): Promise<Response> => {
     // Redirect to app with session established and success parameter
     const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}/dashboard`;
     
+    console.log("Redirecting to:", `${finalRedirect}?confirmation_success=true`);
+    
+    // Important: Browsers require separate Set-Cookie headers for each cookie
+    const headers = new Headers();
+    headers.set("Location", `${finalRedirect}?confirmation_success=true`);
+    headers.append("Set-Cookie", accessTokenCookie);
+    headers.append("Set-Cookie", refreshTokenCookie);
+    
     return new Response(null, {
       status: 302,
-      headers: {
-        "Location": `${finalRedirect}?confirmation_success=true`,
-        "Set-Cookie": [accessTokenCookie, refreshTokenCookie].join(", "),
-      },
+      headers,
     });
 
   } catch (error: any) {
