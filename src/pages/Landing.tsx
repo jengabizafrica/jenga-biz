@@ -65,12 +65,42 @@ const Landing = () => {
     const email = searchParams.get('email');
 
     if (confirmationSuccess) {
-      sonnerToast.success('Email Confirmed!', {
-        description: 'Your email has been successfully verified. Redirecting...',
-        duration: 5000,
-      });
-      // Clean URL and redirect to dashboard
-      setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+      // Check if we have session tokens in URL hash
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+
+      if (accessToken && refreshToken) {
+        // Set session using tokens from URL hash
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }).then(({ error }) => {
+          if (error) {
+            console.error('Error setting session:', error);
+            sonnerToast.error('Session Error', {
+              description: 'Failed to establish session. Please try logging in.',
+              duration: 5000,
+            });
+            navigate('/', { replace: true });
+          } else {
+            sonnerToast.success('Email Confirmed!', {
+              description: 'Your email has been successfully verified. Redirecting...',
+              duration: 3000,
+            });
+            // Redirect to dashboard after short delay
+            setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+          }
+        });
+      } else {
+        // No tokens in hash - just show success and redirect
+        sonnerToast.success('Email Confirmed!', {
+          description: 'Your email has been successfully verified.',
+          duration: 3000,
+        });
+        setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+      }
     } else if (confirmationError) {
       const errorMessages: Record<string, { title: string; description: string }> = {
         expired: {
@@ -131,8 +161,8 @@ const Landing = () => {
         } : undefined,
       });
 
-      // Clean URL
-      navigate('/', { replace: true });
+      // Clean URL after showing error
+      setTimeout(() => navigate('/', { replace: true }), 500);
     }
   }, [searchParams, navigate]);
 

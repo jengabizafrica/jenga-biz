@@ -53,34 +53,16 @@ const handler = async (req: Request): Promise<Response> => {
         .eq("id", data.user.id);
     }
 
-    // Set HttpOnly cookies for session
-    const hostname = new URL(appUrl).hostname;
-    const isProduction = !appUrl.includes("localhost");
-    
-    // Fix domain to work with both jengabiz.africa and www.jengabiz.africa
-    const cookieDomain = hostname === "jengabiz.africa" ? ".jengabiz.africa" : hostname;
-    
-    console.log("Setting cookies for domain:", cookieDomain);
-    console.log("Access token present:", !!data.session.access_token);
-    
-    const accessTokenCookie = `sb-access-token=${data.session.access_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${data.session.expires_in}${isProduction ? "; Secure" : ""}; Domain=${cookieDomain}`;
-    const refreshTokenCookie = `sb-refresh-token=${data.session.refresh_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${isProduction ? "; Secure" : ""}; Domain=${cookieDomain}`;
-
-    // Redirect to app with session established and success parameter
+    // Redirect to app with session tokens in URL hash (secure)
     const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}`;
     
     console.log("Redirecting to:", `${finalRedirect}?confirmation_success=true`);
     
-    // Important: Browsers require separate Set-Cookie headers for each cookie
-    const headers = new Headers();
-    headers.set("Location", `${finalRedirect}?confirmation_success=true`);
-    headers.append("Set-Cookie", accessTokenCookie);
-    headers.append("Set-Cookie", refreshTokenCookie);
+    // Pass tokens in URL hash (not query params) for security
+    // Client will read these and call setSession()
+    const redirectUrl = `${finalRedirect}?confirmation_success=true#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}&expires_in=${data.session.expires_in}&token_type=bearer`;
     
-    return new Response(null, {
-      status: 302,
-      headers,
-    });
+    return Response.redirect(redirectUrl, 302);
 
   } catch (error: any) {
     console.error("Error in confirm-email function:", error);
