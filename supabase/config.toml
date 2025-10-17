@@ -8,6 +8,9 @@ additional_redirect_urls = ["https://jenga-biz.vercel.app/auth", "https://jenga-
 [auth.email]
 enable_confirmations = true
 
+[functions.subscriptions]
+verify_jwt = false
+
 [functions.send-password-reset]
 verify_jwt = false
 

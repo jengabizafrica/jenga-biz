@@ -474,7 +474,6 @@ class EdgeFunctionsApiClient {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'apikey': anonKey,
-        'Authorization': `Bearer ${anonKey}`,
       } as Record<string, string>;
 
       let response: Response;
