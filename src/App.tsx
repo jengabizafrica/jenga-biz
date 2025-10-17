@@ -19,6 +19,8 @@ import Strategy from "./pages/Strategy";
 import Profile from "./pages/Profile";
 import Pricing from "./pages/Pricing";
 import BillingReturn from "./pages/BillingReturn";
+import BillingSuccess from "./pages/BillingSuccess";
+import BillingError from "./pages/BillingError";
 import UserDashboard from "./components/UserDashboard";
 import SaaSFeatures from "./components/SaaSFeatures";
 import { HubContextProvider } from '@/hooks/useHubContext';
@@ -57,6 +59,8 @@ const App = () => (
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/billing/return" element={<ProtectedRoute><BillingReturn /></ProtectedRoute>} />
+                <Route path="/billing/success" element={<ProtectedRoute><BillingSuccess /></ProtectedRoute>} />
+                <Route path="/billing/error" element={<ProtectedRoute><BillingError /></ProtectedRoute>} />
                 <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["entrepreneur","hub_manager","admin","super_admin"]}><UserDashboard /></ProtectedRoute>} />
                 <Route path="/saas" element={<ProtectedRoute allowedRoles={["hub_manager","admin","super_admin"]}><SaaSFeatures onSignOut={() => {}} /></ProtectedRoute>} />
                 <Route path="/super-admin" element={<ProtectedRoute allowedRoles={["super_admin"]}><AdminDashboard /></ProtectedRoute>} />

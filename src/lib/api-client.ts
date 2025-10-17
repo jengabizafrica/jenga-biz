@@ -612,8 +612,14 @@ class EdgeFunctionsApiClient {
     access_code: string;
     reference: string;
   }> {
-    const payload: Record<string, unknown> = { plan_id: planId };
-    if (callbackUrl) payload.callback_url = callbackUrl;
+    // Use dedicated success callback URL if not provided
+    const finalCallbackUrl = callbackUrl || `${window.location.origin}/billing/success`;
+    
+    const payload: Record<string, unknown> = { 
+      plan_id: planId,
+      callback_url: finalCallbackUrl
+    };
+    
     const res = await this.request<ApiResponse<{ authorization_url: string; access_code: string; reference: string }>>(
       'subscriptions/paystack/initiate',
       { method: 'POST', body: JSON.stringify(payload) }
