@@ -67,7 +67,7 @@ const handler = async (req: Request): Promise<Response> => {
     const refreshTokenCookie = `sb-refresh-token=${data.session.refresh_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${isProduction ? "; Secure" : ""}; Domain=${cookieDomain}`;
 
     // Redirect to app with session established and success parameter
-    const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}/dashboard`;
+    const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}`;
     
     console.log("Redirecting to:", `${finalRedirect}?confirmation_success=true`);
     

@@ -6,8 +6,9 @@ import { ApprovalStatusBanner } from '@/components/ApprovalStatusBanner';
 import { LogIn, Rocket, ShieldCheck, BarChart3, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoles } from '@/hooks/useRoles';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast as sonnerToast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const RoleAwareSaaSButton = () => {
   const { roles, loading } = useRoles();
@@ -55,6 +56,85 @@ const Landing = () => {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Handle email confirmation parameters
+  useEffect(() => {
+    const confirmationSuccess = searchParams.get('confirmation_success');
+    const confirmationError = searchParams.get('confirmation_error');
+    const email = searchParams.get('email');
+
+    if (confirmationSuccess) {
+      sonnerToast.success('Email Confirmed!', {
+        description: 'Your email has been successfully verified. Redirecting...',
+        duration: 5000,
+      });
+      // Clean URL and redirect to dashboard
+      setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
+    } else if (confirmationError) {
+      const errorMessages: Record<string, { title: string; description: string }> = {
+        expired: {
+          title: 'Confirmation Link Expired',
+          description: 'Your confirmation link has expired. Please request a new one.',
+        },
+        failed: {
+          title: 'Confirmation Failed',
+          description: 'Unable to verify your email. Please try again or contact support.',
+        },
+        missing_token: {
+          title: 'Invalid Link',
+          description: 'The confirmation link is invalid. Please check your email for the correct link.',
+        },
+        unexpected: {
+          title: 'Unexpected Error',
+          description: 'An unexpected error occurred. Please try again later.',
+        },
+      };
+
+      const errorType = confirmationError as keyof typeof errorMessages;
+      const errorInfo = errorMessages[errorType] || errorMessages.unexpected;
+
+      sonnerToast.error(errorInfo.title, {
+        description: errorInfo.description,
+        duration: 8000,
+        action: errorType === 'expired' && email ? {
+          label: 'Resend Email',
+          onClick: async () => {
+            try {
+              const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: decodeURIComponent(email),
+              });
+
+              if (error) {
+                if (error.message.includes('rate limit') || error.message.includes('Email rate limit exceeded')) {
+                  sonnerToast.error('Rate Limit Exceeded', {
+                    description: 'You can only request 3 confirmation emails per hour. Please try again later.',
+                    duration: 6000,
+                  });
+                } else {
+                  throw error;
+                }
+              } else {
+                sonnerToast.success('Confirmation Email Sent!', {
+                  description: 'Please check your inbox and spam folder.',
+                  duration: 6000,
+                });
+              }
+            } catch (err: any) {
+              sonnerToast.error('Failed to Resend', {
+                description: err.message || 'Unable to resend confirmation email. Please try again later.',
+                duration: 6000,
+              });
+            }
+          },
+        } : undefined,
+      });
+
+      // Clean URL
+      navigate('/', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Check for signup success message from sessionStorage
   useEffect(() => {
