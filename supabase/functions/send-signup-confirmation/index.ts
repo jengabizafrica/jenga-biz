@@ -3,6 +3,39 @@
 // checks here to keep the repo typecheckable locally.
 // @ts-ignore: Deno std import for runtime (ignored by Node tsc)
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// Helper: verify Supabase webhook signature using HMAC-SHA256
+// Supabase sends headers `webhook-signature` (format may include t=<ts>,v1=<hex>) and `webhook-timestamp`.
+async function verifyWebhook(bodyText: string, headersObj: Record<string, string | undefined>, secret: string): Promise<boolean> {
+  const sigHeader = headersObj["webhook-signature"] || headersObj["Webhook-Signature"];
+  let timestamp = headersObj["webhook-timestamp"] || headersObj["Webhook-Timestamp"];
+  if (!sigHeader) return false;
+
+  // Try to extract v1=signature from header, or use header directly
+  let sigHex: string | null = null;
+  const v1Match = /v1=([0-9a-fA-F]+)/.exec(sigHeader);
+  if (v1Match) sigHex = v1Match[1];
+  else {
+    // fallback: header might be raw hex or include t=...; try to extract t= and v1= pairs
+    const rawMatch = /([0-9a-fA-F]{64})/.exec(sigHeader);
+    if (rawMatch) sigHex = rawMatch[1];
+  }
+
+  if (!timestamp) {
+    const tMatch = /t=([^,]+)/.exec(sigHeader);
+    if (tMatch) timestamp = tMatch[1];
+  }
+
+  if (!timestamp || !sigHex) return false;
+
+  const data = `${timestamp}.${bodyText}`;
+  const enc = new TextEncoder();
+  const keyData = enc.encode(secret);
+  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(data));
+  const sigArray = new Uint8Array(sig);
+  const hex = Array.from(sigArray).map(b => b.toString(16).padStart(2, '0')).join('');
+  return hex === sigHex.toLowerCase();
+}
 
 
 // Provide a fallback declaration so TypeScript in the editor doesn't error on `Deno`.
@@ -37,59 +70,111 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Read request text early so we can verify webhook signature if present.
+    // NOTE: We avoid logging header values or the secret itself to prevent leaks.
     let body: SignupEmailRequest;
     const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
-        //add console log to see the hook secret
     console.debug("send-signup-confirmation: hookSecret present=", !!hookSecret);
-    console.debug("send-signup-confirmation: hookSecret =", hookSecret);
-    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
-    // Debug: log header names (keys) and whether an Authorization header is present.
-    // IMPORTANT: do NOT log header values to avoid leaking secrets.
+
+    // Short-circuit health probe before consuming the body
+    const url = new URL(req.url);
+    if (req.method === "GET" && url.pathname.endsWith("/health")) {
+      const brevoEnv = Deno.env.get("BREVO_API_KEY");
+      const sender = Deno.env.get("BREVO_SENDER_EMAIL") || "unset";
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          brevo_present: !!brevoEnv,
+          brevo_masked: (brevoEnv ? `${brevoEnv.slice(0,4)}...(${brevoEnv.length})` : null),
+          sender,
+        }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
+    const bodyText = await req.text();
+    // Build a simple headers object for verification libraries
+    const headersObj = Object.fromEntries(req.headers);
+
+    // Log header keys only and whether an Authorization header is present (boolean)
     try {
       console.debug(
         "send-signup-confirmation: incoming header keys=",
         Array.from(req.headers.keys()),
-        "auth present=",authHeader,
+        "auth present=", !!headersObj["authorization"],
       );
     } catch (e) {
-      // ignore any logging errors
+      // ignore logging errors
     }
 
+    // Attempt signature verification when hook secret and signature headers exist
+    let raw: any = null;
     if (hookSecret) {
-      if (!authHeader) {
-        console.error("[send-signup-confirmation] Missing Authorization header");
-        return new Response(
-          JSON.stringify({ error: "unauthorized" }),
-          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
+      const sig = headersObj["webhook-signature"] || headersObj["Webhook-Signature"];
+      const ts = headersObj["webhook-timestamp"] || headersObj["Webhook-Timestamp"];
+      if (sig && ts) {
+        // use the raw secret (strip v1,whsec_ prefix if present)
+        const rawSecret = hookSecret.startsWith("v1,whsec_") ? hookSecret.substring(9) : hookSecret;
+        try {
+          const ok = await verifyWebhook(bodyText || '', headersObj as Record<string,string|undefined>, rawSecret as string);
+          if (!ok) throw new Error('signature_mismatch');
+          raw = JSON.parse(bodyText || '{}');
+          console.debug("send-signup-confirmation: webhook signature verified (HMAC)");
+        } catch (e: any) {
+          console.error("[send-signup-confirmation] Webhook signature verification failed:", e?.message || e);
+          return new Response(
+            JSON.stringify({ error: "unauthorized" }),
+            { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+      } else {
+        // Fallback to Authorization bearer token check if no signature headers present
+        const authHeader = headersObj["authorization"] || headersObj["Authorization"];
+        if (!authHeader) {
+          console.error("[send-signup-confirmation] Missing Authorization header");
+          return new Response(
+            JSON.stringify({ error: "unauthorized" }),
+            { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
 
-      // Extract token from "Bearer <token>" format
-      const token = authHeader.replace(/^Bearer\s+/i, '');
-      
-      // Normalize both values for comparison - handle v1,whsec_ prefix
-      const normalizeSecret = (secret: string) => {
-        return secret.startsWith('v1,whsec_') ? secret.substring(9) : secret;
-      };
-
-      const normalizedToken = normalizeSecret(token);
-      const normalizedSecret = normalizeSecret(hookSecret);
-
-      // Compare either full values or normalized values
-      if (token !== hookSecret && normalizedToken !== normalizedSecret) {
-        console.error("[send-signup-confirmation] Invalid Authorization bearer token");
-        return new Response(
-          JSON.stringify({ error: "unauthorized" }),
-          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
+        const token = String(authHeader).replace(/^Bearer\s+/i, '');
+        const normalizeSecret = (secret: string) => secret.startsWith('v1,whsec_') ? secret.substring(9) : secret;
+        const normalizedToken = normalizeSecret(token);
+        const normalizedSecret = normalizeSecret(hookSecret);
+        if (token !== hookSecret && normalizedToken !== normalizedSecret) {
+          console.error("[send-signup-confirmation] Invalid Authorization bearer token");
+          return new Response(
+            JSON.stringify({ error: "unauthorized" }),
+            { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
+        // parse bodyText into raw for later processing
+        try {
+          raw = JSON.parse(bodyText || '{}');
+        } catch (e: any) {
+          console.error("[send-signup-confirmation] Failed to parse JSON body:", e?.message || e);
+          return new Response(
+            JSON.stringify({ error: "invalid_json" }),
+            { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+          );
+        }
       }
     } else {
       console.warn("[send-signup-confirmation] SEND_EMAIL_HOOK_SECRET not configured; accepting request (development mode)");
+      try {
+        raw = JSON.parse(bodyText || '{}');
+      } catch (e: any) {
+        console.error("[send-signup-confirmation] Failed to parse JSON body:", e?.message || e);
+        return new Response(
+          JSON.stringify({ error: "invalid_json" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
     }
 
-    // Parse JSON body and normalize fields from Supabase hook shape
+    // Now `raw` contains the parsed payload (either from signature verification or parsed bodyText)
     try {
-      const raw: any = await req.json();
       const ed = raw?.email_data || raw?.email || null;
       body = {
         email: raw?.user?.email || raw?.email?.recipient || raw?.email || "",
