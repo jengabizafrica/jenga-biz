@@ -72,7 +72,7 @@ const Landing = () => {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10 landing-header">
         <div className="max-w-full sm:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 landing-wrapper">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center py-4 max-w-full">
             <div className="flex-0" />
             <div className="flex items-center gap-2 overflow-auto sm:overflow-visible whitespace-nowrap landing-controls">
               <img
