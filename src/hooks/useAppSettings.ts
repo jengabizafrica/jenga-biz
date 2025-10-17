@@ -13,6 +13,8 @@ interface UseAppSettingsReturn {
   setAllowedCurrencies: (currencies: string[]) => Promise<boolean>;
   getPaystackWebhookUrl: () => Promise<string>;
   setPaystackWebhookUrl: (url: string) => Promise<boolean>;
+  getPaystackCallbackUrl: () => Promise<string>;
+  setPaystackCallbackUrl: (url: string) => Promise<boolean>;
 }
 
 /**
@@ -240,6 +242,57 @@ export function useAppSettings(): UseAppSettingsReturn {
     }
   }, []);
 
+  /**
+   * Get Paystack callback URL
+   */
+  const getPaystackCallbackUrl = useCallback(async (): Promise<string> => {
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'paystack_callback_url')
+        .maybeSingle();
+      
+      if (error) {
+        setError(error.message);
+        return '';
+      }
+      return data?.value || '';
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      return '';
+    }
+  }, []);
+
+  /**
+   * Set Paystack callback URL
+   */
+  const setPaystackCallbackUrl = useCallback(async (url: string): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.rpc('set_system_setting', {
+        p_key: 'paystack_callback_url',
+        p_value: url,
+        p_reason: 'Update from admin UI'
+      });
+      
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      setLoading(false);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      return false;
+    }
+  }, []);
+
   return {
     loading,
     error,
@@ -251,6 +304,8 @@ export function useAppSettings(): UseAppSettingsReturn {
     setAllowedCurrencies,
     getPaystackWebhookUrl,
     setPaystackWebhookUrl,
+    getPaystackCallbackUrl,
+    setPaystackCallbackUrl,
   };
 }
 

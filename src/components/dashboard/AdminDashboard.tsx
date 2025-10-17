@@ -43,6 +43,7 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
   const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false);
   const [allowedCurrencies, setAllowedCurrencies] = useState<string[]>([]);
   const [paystackWebhookUrl, setPaystackWebhookUrl] = useState<string>('');
+  const [paystackCallbackUrl, setPaystackCallbackUrl] = useState<string>('');
   const { 
     getAutoApprove, 
     setAutoApprove, 
@@ -52,32 +53,37 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
     setAllowedCurrencies: saveAllowedCurrencies,
     getPaystackWebhookUrl,
     setPaystackWebhookUrl: savePaystackWebhookUrl,
+    getPaystackCallbackUrl,
+    setPaystackCallbackUrl: savePaystackCallbackUrl,
     loading: settingsLoading, 
     error: settingsError 
   } = useAppSettings();
 
   const loadSettings = async () => {
-    const [autoApprove, maintenance, currencies, webhookUrl] = await Promise.all([
+    const [autoApprove, maintenance, currencies, webhookUrl, callbackUrl] = await Promise.all([
       getAutoApprove(),
       getMaintenanceMode(),
       getAllowedCurrencies(),
       getPaystackWebhookUrl(),
+      getPaystackCallbackUrl(),
     ]);
     setAutoApproveOrgs(autoApprove);
     setMaintenanceMode(maintenance);
     setAllowedCurrencies(currencies);
     setPaystackWebhookUrl(webhookUrl);
+    setPaystackCallbackUrl(callbackUrl);
   };
 
   const saveSettings = async () => {
-    const [s1, s2, s3, s4] = await Promise.all([
+    const [s1, s2, s3, s4, s5] = await Promise.all([
       setAutoApprove(autoApproveOrgs),
       saveMaintenanceMode(maintenanceMode),
       saveAllowedCurrencies(allowedCurrencies),
       savePaystackWebhookUrl(paystackWebhookUrl),
+      savePaystackCallbackUrl(paystackCallbackUrl),
     ]);
     
-    if (s1 && s2 && s3 && s4) {
+    if (s1 && s2 && s3 && s4 && s5) {
       toast({ title: 'Settings saved', description: 'System settings updated successfully.' });
     } else if (settingsError) {
       toast({ title: 'Save failed', description: settingsError, variant: 'destructive' });
@@ -521,6 +527,35 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           Configure this URL in Paystack dashboard. Update when switching from sandbox to live.
+                        </p>
+                      </div>
+
+                      {/* Paystack Callback URL */}
+                      <div className="space-y-2">
+                        <Label htmlFor="callback">Paystack Callback URL</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="callback"
+                            value={paystackCallbackUrl}
+                            onChange={(e) => setPaystackCallbackUrl(e.target.value)}
+                            placeholder="https://jengabiz.africa/billing/success"
+                            disabled={settingsLoading}
+                            className="flex-1 font-mono text-xs"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(paystackCallbackUrl);
+                              toast({ title: 'Copied!', description: 'Callback URL copied to clipboard' });
+                            }}
+                            disabled={!paystackCallbackUrl}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Where users are redirected after completing payment. Typically your /billing/success page.
                         </p>
                       </div>
 
