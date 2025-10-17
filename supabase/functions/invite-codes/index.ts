@@ -207,6 +207,10 @@ const handler = async (req: Request): Promise<Response> => {
       return await consumeInviteCode(req);
     }
 
+    if (method === "DELETE") {
+      return await deleteInviteCode(req);
+    }
+
     return errorResponse("NOT_FOUND", "Endpoint not found", 404);
   } catch (error) {
     return handleError(error);
