@@ -612,8 +612,10 @@ class EdgeFunctionsApiClient {
     access_code: string;
     reference: string;
   }> {
-    // Use dedicated success callback URL if not provided
-    const finalCallbackUrl = callbackUrl || `${window.location.origin}/billing/success`;
+    // Use the edge function as callback to verify and then redirect
+    const projectId = 'diclwatocrixibjpajuf';
+    const edgeFunctionUrl = `https://${projectId}.supabase.co/functions/v1/paystack-confirm`;
+    const finalCallbackUrl = callbackUrl || edgeFunctionUrl;
     
     const payload: Record<string, unknown> = { 
       plan_id: planId,

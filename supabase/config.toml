@@ -20,3 +20,6 @@ verify_jwt = false
 [functions.confirm-email]
 verify_jwt = false
 
+[functions.paystack-confirm]
+verify_jwt = false
+

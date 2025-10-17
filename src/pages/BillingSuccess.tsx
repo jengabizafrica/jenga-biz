@@ -14,42 +14,39 @@ export default function BillingSuccess() {
   useEffect(() => {
     const verifyPayment = async () => {
       try {
-        const status = searchParams.get('status');
+        const reference = searchParams.get('reference');
         
-        // If Paystack redirected with explicit failure, go to error page
-        if (status !== 'success') {
-          navigate('/billing/error?reason=payment_failed');
+        // Edge function already verified - just confirm with reference
+        if (!reference) {
+          navigate('/billing/error?reason=no_reference');
           return;
         }
 
-        // Give webhook a moment to process
-        await new Promise(r => setTimeout(r, 1500));
+        setMessage('Confirming your subscription...');
         
-        // Verify subscription is active
+        // Brief delay for webhook processing
+        await new Promise(r => setTimeout(r, 2000));
+        
         const subscription = await apiClient.getMySubscription();
         
         if (subscription && subscription.status === 'active') {
-          setMessage('Payment confirmed! Your subscription is now active.');
+          setMessage('Payment successful! Your subscription is now active.');
           setVerifying(false);
-          
-          // Auto-redirect to dashboard after 2 seconds
-          setTimeout(() => navigate('/dashboard'), 2000);
+          setTimeout(() => navigate('/dashboard'), 1500);
         } else {
-          // Fallback: poll once more
-          await new Promise(r => setTimeout(r, 2000));
-          const sub2 = await apiClient.getMySubscription();
-          
-          if (sub2 && sub2.status === 'active') {
-            setMessage('Payment confirmed! Your subscription is now active.');
+          // One retry
+          await new Promise(r => setTimeout(r, 1500));
+          const sub = await apiClient.getMySubscription();
+          if (sub && sub.status === 'active') {
+            setMessage('Payment successful! Your subscription is now active.');
             setVerifying(false);
-            setTimeout(() => navigate('/dashboard'), 2000);
+            setTimeout(() => navigate('/dashboard'), 1500);
           } else {
-            // Webhook might be delayed
-            navigate('/billing/error?reason=verification_pending');
+            navigate('/billing/error?reason=pending_activation');
           }
         }
       } catch (error) {
-        console.error('Payment verification failed:', error);
+        console.error('Verification error:', error);
         navigate('/billing/error?reason=verification_error');
       }
     };
