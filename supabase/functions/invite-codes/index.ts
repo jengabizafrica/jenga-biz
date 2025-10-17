@@ -777,15 +777,23 @@ async function consumeInviteCode(req: Request): Promise<Response> {
 
 serve(handler);
 
-// DELETE /invite-codes?id=<uuid>
+// DELETE /invite-codes/{id}
 async function deleteInviteCode(req: Request): Promise<Response> {
   const { user, supabase } = await getUserFromRequest(req);
   // require at least admin privileges
   requireAdmin(user);
 
   const url = new URL(req.url);
+  // Extract ID from path: /invite-codes/{id}
+  const pathParts = url.pathname.split('/');
+  const id = pathParts[pathParts.length - 1];
+  
+  // Validate the ID is a valid UUID
   const schema = z.object({ id: z.string().uuid() });
-  const { id } = validateQuery(url, schema) as { id: string };
+  const validated = schema.safeParse({ id });
+  if (!validated.success) {
+    return errorResponse("VALIDATION_ERROR", "Invalid invite ID format", 400);
+  }
 
   // Fetch the invite
   const { data: invite, error: inviteErr } = await supabase
