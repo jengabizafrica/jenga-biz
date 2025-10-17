@@ -456,7 +456,7 @@ const CombinedStrategyFlow = ({
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 gap-4 md:flex-row">
             {/* Left section - Logo and main actions */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
               <img src="/jenga-biz-logo.png" alt="Jenga Biz Africa" className="h-12 w-auto" />
