@@ -36,7 +36,53 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const body: SignupEmailRequest = await req.json();
+    let body: SignupEmailRequest;
+    
+    // Verify webhook signature if SEND_EMAIL_HOOK_SECRET is configured
+    const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
+    if (hookSecret) {
+      const signature = req.headers.get("webhook-signature");
+      if (!signature) {
+        console.error("Missing webhook signature");
+        return new Response(
+          JSON.stringify({ error: "Missing webhook signature" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      // Strip v1,whsec_ prefix if present
+      const actualSecret = hookSecret.startsWith("v1,whsec_") 
+        ? hookSecret.substring(9) 
+        : hookSecret;
+
+      // Read payload for verification
+      const payload = await req.text();
+      
+      // Verify signature using HMAC
+      const expectedSig = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(actualSecret + payload)
+      );
+      const expectedSigHex = Array.from(new Uint8Array(expectedSig))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      if (!signature.includes(expectedSigHex)) {
+        console.error("Invalid webhook signature");
+        return new Response(
+          JSON.stringify({ error: "Invalid webhook signature" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      // Parse body after successful verification
+      body = JSON.parse(payload);
+      console.log("Webhook signature verified successfully");
+    } else {
+      // No secret configured, accept request without verification (development mode)
+      console.warn("SEND_EMAIL_HOOK_SECRET not configured, skipping webhook verification");
+      body = await req.json();
+    }
 
     // Log full payload in development to help debugging (best-effort)
     const isDev = (Deno.env.get("ENV") === "development") ||
@@ -59,14 +105,17 @@ const handler = async (req: Request): Promise<Response> => {
     const token = body.token;
     const siteUrl = Deno.env.get("SITE_CONFIRMATION_URL") || "https://jengabiz.africa";
     
-    // Build confirmation URL using token_hash for secure PKCE flow
+    // Build server-side confirmation URL pointing to edge function
+    const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-email`;
+    const redirectTo = body.redirect_to || `${siteUrl}/dashboard`;
+    
     let confirmationUrl: string;
     if (tokenHash) {
-      confirmationUrl = `${siteUrl}/confirm-email?token_hash=${encodeURIComponent(tokenHash)}&type=signup`;
+      confirmationUrl = `${functionUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=signup&redirect_to=${encodeURIComponent(redirectTo)}`;
     } else if (body.confirmationUrl) {
       confirmationUrl = body.confirmationUrl;
     } else {
-      confirmationUrl = `${siteUrl}/confirm-email`;
+      confirmationUrl = `${functionUrl}?redirect_to=${encodeURIComponent(redirectTo)}`;
     }
 
     const subject = body.subject ||
