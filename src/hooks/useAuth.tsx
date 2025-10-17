@@ -45,11 +45,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, fullName: string, accountType?: string, inviteCode?: string) => {
+    console.log('[useAuth] signUp called with:', {
+      email,
+      fullName,
+      accountType,
+      inviteCode: inviteCode || 'none'
+    });
+    
     const at = String(accountType || '').toLowerCase();
     const normalized = ['organization','ecosystem enabler','enabler','org'].includes(at) ? 'organization' : 'business';
     const confirmUrl = `${window.location.origin}/confirm-email`;
     
-    const { error } = await supabase.auth.signUp({
+    console.log('[useAuth] Normalized account type:', normalized);
+    console.log('[useAuth] Confirm URL:', confirmUrl);
+    console.log('[useAuth] Calling supabase.auth.signUp with options:', {
+      email,
+      emailRedirectTo: confirmUrl,
+      metadata: {
+        full_name: fullName,
+        account_type: normalized,
+        invite_code: inviteCode
+      }
+    });
+    
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -61,6 +80,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       },
     });
+    
+    console.log('[useAuth] supabase.auth.signUp response:', {
+      user: data?.user?.id,
+      session: data?.session?.access_token ? 'present' : 'null',
+      error: error ? {
+        message: error.message,
+        status: error.status,
+        name: error.name
+      } : null
+    });
+    
+    if (error) {
+      console.error('[useAuth] Signup error details:', error);
+    } else {
+      console.log('[useAuth] Signup successful');
+    }
+    
     return { error };
   };
 

@@ -93,17 +93,20 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[AUTH] Login attempt started', { email: loginData.email });
     setIsLoading(true);
 
     const { error } = await signIn(loginData.email, loginData.password);
     
     if (error) {
+      console.error('[AUTH] Login failed:', error);
       toast({
         title: "Login Failed",
         description: formatError(error),
         variant: "destructive",
       });
     } else {
+      console.log('[AUTH] Login successful');
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
@@ -136,9 +139,16 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[AUTH] Signup attempt started', { 
+      email: signupData.email, 
+      fullName: signupData.fullName,
+      accountType: signupData.accountType,
+      hasInviteCode: !!signupData.inviteCode 
+    });
     
     // Validate password strength
     if (passwordStrength.score < 4) {
+      console.warn('[AUTH] Password too weak', { score: passwordStrength.score, feedback: passwordStrength.feedback });
       toast({
         title: "Password Too Weak",
         description: passwordStrength.feedback,
@@ -152,6 +162,13 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
 
     setIsLoading(true);
 
+    console.log('[AUTH] Calling signUp with data:', {
+      email: signupData.email,
+      fullName: signupData.fullName,
+      accountType: signupData.accountType,
+      inviteCode: signupData.inviteCode || 'none'
+    });
+
     const { error } = await signUp(
       signupData.email,
       signupData.password,
@@ -161,6 +178,7 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
     );
 
     if (error) {
+      console.error('[AUTH] Signup failed:', error);
       toast({
         title: "Signup Failed",
         description: formatError(error),
@@ -170,11 +188,17 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
       return;
     }
 
+    console.log('[AUTH] Signup successful, proceeding with post-signup');
+
     try {
       // Attempt to fetch the newly created user
+      console.log('[AUTH] Fetching newly created user...');
       const { data: { user: newUser } } = await supabase.auth.getUser();
+      console.log('[AUTH] User fetched:', { userId: newUser?.id, email: newUser?.email });
+      
       if (newUser?.id) {
         if (signupData.accountType === 'organization') {
+          console.log('[AUTH] Processing organization signup with RPC');
           // Use the handle_org_signup RPC for organization accounts
           const { data: result, error: rpcError } = await supabase.rpc('handle_org_signup', {
             user_id: newUser.id,
@@ -183,8 +207,10 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
             invite_code: signupData.inviteCode || undefined
           }) as { data: { status: string } | null; error: any };
 
+          console.log('[AUTH] RPC response:', { result, error: rpcError });
+
           if (rpcError) {
-            console.error('Organization signup error:', rpcError);
+            console.error('[AUTH] Organization signup RPC error:', rpcError);
             toast({
               title: 'Signup Error',
               description: 'Failed to complete organization signup. Please contact support.',
@@ -228,6 +254,7 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
           return;
         } else {
           // For business accounts, create basic profile
+          console.log('[AUTH] Creating business profile');
           const profilePayload: any = {
             email: signupData.email,
             full_name: signupData.fullName,
@@ -235,8 +262,12 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
             is_profile_complete: false
           };
 
-          await saveProfileForUser(newUser.id, profilePayload);
+          console.log('[AUTH] Profile payload:', profilePayload);
+          const profileResult = await saveProfileForUser(newUser.id, profilePayload);
+          console.log('[AUTH] Profile creation result:', profileResult);
         }
+      } else {
+        console.warn('[AUTH] No user ID found after signup');
       }
 
       toast({
@@ -249,13 +280,19 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
         window.location.href = '/profile';
       }, 1000);
     } catch (e: any) {
-      console.error('Error post-signup:', e);
+      console.error('[AUTH] Error in post-signup processing:', {
+        error: e,
+        message: e?.message,
+        stack: e?.stack,
+        name: e?.name
+      });
       toast({ title: 'Signup', description: 'Account created. Please check your email.' });
       setTimeout(() => {
         onOpenChange(false);
         window.location.href = '/';
       }, 1000);
     } finally {
+      console.log('[AUTH] Signup process completed, setting loading to false');
       setIsLoading(false);
     }
   };
