@@ -39,6 +39,8 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     let body: SignupEmailRequest;
     const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
+        //add console log to see the hook secret
+    console.debug("send-signup-confirmation: hookSecret present=", !!hookSecret);
     const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
 
     if (hookSecret) {
