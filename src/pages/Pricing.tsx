@@ -4,7 +4,7 @@ import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, LogIn, UserPlus } from 'lucide-react';
+import { Loader2, LogIn, UserPlus, Check } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { EnhancedAuthDialog } from '@/components/auth/EnhancedAuthDialog';
 import { CurrencySelector } from '@/components/CurrencySelector';
@@ -199,16 +199,35 @@ export default function Pricing() {
             const displayPrice = getDisplayPrice(plan);
             const isFree = Number(displayPrice.price) === 0;
             const hasMultipleCycles = plan.available_cycles && plan.available_cycles.length > 1;
+            const limits = plan.features?.limits || {};
+            const features = plan.features?.features || {};
             
             return (
-              <Card key={plan.id}>
+              <Card key={plan.id} className="flex flex-col">
                 <CardHeader>
-                  <CardTitle>{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
+                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                  <div className="mt-4">
+                    <div className="text-4xl font-bold">
+                      {currentCurrency.symbol}{Number(displayPrice.price).toFixed(2)}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      <span className="capitalize">{displayPrice.cycle}</span>
+                      {displayPrice.currency !== selectedCurrency && (
+                        <>
+                          <span className="mx-1">•</span>
+                          <span>{displayPrice.currency}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 flex flex-col">
+                  <CardDescription className="mb-6 text-sm leading-relaxed">
+                    {plan.description}
+                  </CardDescription>
+
                   {hasMultipleCycles && (
-                    <div className="mb-4">
+                    <div className="mb-6">
                       <label className="text-sm font-medium mb-2 block">Billing Cycle</label>
                       <div className="flex gap-2">
                         {(plan.available_cycles || []).map((cycle) => (
@@ -225,31 +244,97 @@ export default function Pricing() {
                       </div>
                     </div>
                   )}
-                  <div className="mb-4">
-                    <div className="text-3xl font-semibold">
-                      {currentCurrency.symbol} {Number(displayPrice.price).toFixed(2)}
+
+                  {/* Plan Limits */}
+                  {Object.keys(limits).length > 0 && (
+                    <div className="mb-6 p-3 bg-muted/50 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-2">Plan Limits</h4>
+                      <ul className="space-y-1 text-sm">
+                        {limits.businesses && (
+                          <li className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-primary" />
+                            <span>{limits.businesses} {limits.businesses === 1 ? 'business' : 'businesses'}</span>
+                          </li>
+                        )}
+                        {limits.storage_mb && (
+                          <li className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-primary" />
+                            <span>{limits.storage_mb >= 1024 ? `${(limits.storage_mb / 1024).toFixed(0)} GB` : `${limits.storage_mb} MB`} storage</span>
+                          </li>
+                        )}
+                      </ul>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      <span className="capitalize">{displayPrice.cycle}</span>
-                      <span className="mx-1">•</span>
-                      <span>{displayPrice.currency}</span>
-                    </div>
-                  </div>
-                  {isFree ? (
-                    <Button variant="outline" className="w-full" disabled>
-                      Free (Dev: all features available)
-                    </Button>
-                  ) : (
-                    <Button className="w-full" onClick={() => handleSubscribe(plan.id)} disabled={busyPlan === plan.id}>
-                      {busyPlan === plan.id ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting...
-                        </>
-                      ) : (
-                        <>Subscribe</>
-                      )}
-                    </Button>
                   )}
+
+                  {/* Features List */}
+                  {Object.keys(features).length > 0 && (
+                    <div className="mb-6 flex-1">
+                      <h4 className="font-semibold text-sm mb-3">Features</h4>
+                      <ul className="space-y-2">
+                        {features.dashboard && (
+                          <li className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>Dashboard access</span>
+                          </li>
+                        )}
+                        {features.templates_all && (
+                          <li className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>All business templates</span>
+                          </li>
+                        )}
+                        {features.transactions && (
+                          <li className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>Financial tracking</span>
+                          </li>
+                        )}
+                        {features.ocr && (
+                          <li className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>OCR receipt scanning</span>
+                          </li>
+                        )}
+                        {features.reports_basic && (
+                          <li className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>Basic reports</span>
+                          </li>
+                        )}
+                        {features.reports_advanced && (
+                          <li className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>Advanced reports & analytics</span>
+                          </li>
+                        )}
+                        {features.priority_support && (
+                          <li className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>Priority support</span>
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Subscribe Button */}
+                  <div className="mt-auto">
+                    {isFree ? (
+                      <Button variant="outline" className="w-full" disabled>
+                        Current Plan
+                      </Button>
+                    ) : (
+                      <Button className="w-full" onClick={() => handleSubscribe(plan.id)} disabled={busyPlan === plan.id}>
+                        {busyPlan === plan.id ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting...
+                          </>
+                        ) : (
+                          <>Subscribe Now</>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
