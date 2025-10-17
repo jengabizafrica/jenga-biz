@@ -7,6 +7,7 @@ import { LogIn, Rocket, ShieldCheck, BarChart3, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRoles } from '@/hooks/useRoles';
 import { useNavigate } from 'react-router-dom';
+import { toast as sonnerToast } from 'sonner';
 
 const RoleAwareSaaSButton = () => {
   const { roles, loading } = useRoles();
@@ -54,6 +55,18 @@ const Landing = () => {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+
+  // Check for signup success message from sessionStorage
+  useEffect(() => {
+    const signupSuccess = sessionStorage.getItem('signup_success');
+    if (signupSuccess === 'true') {
+      sessionStorage.removeItem('signup_success');
+      sonnerToast.success('Account Created!', {
+        description: 'Please check your email to verify your account.',
+        duration: 8000,
+      });
+    }
+  }, []);
 
   // Check for password reset tokens and redirect to reset page
   useEffect(() => {

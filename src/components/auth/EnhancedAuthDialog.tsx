@@ -270,15 +270,12 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
         console.warn('[AUTH] No user ID found after signup');
       }
 
-      toast({
-        title: "Account Created!",
-        description: "Please check your email to verify your account.",
-      });
+      // Store signup success message in sessionStorage so it persists across redirect
+      sessionStorage.setItem('signup_success', 'true');
+      
       // Redirect to profile page to complete setup
-      setTimeout(() => {
-        onOpenChange(false);
-        window.location.href = '/profile';
-      }, 1000);
+      onOpenChange(false);
+      window.location.href = '/profile';
     } catch (e: any) {
       console.error('[AUTH] Error in post-signup processing:', {
         error: e,
@@ -286,11 +283,11 @@ export function EnhancedAuthDialog({ open, onOpenChange, defaultTab = 'login' }:
         stack: e?.stack,
         name: e?.name
       });
-      toast({ title: 'Signup', description: 'Account created. Please check your email.' });
-      setTimeout(() => {
-        onOpenChange(false);
-        window.location.href = '/';
-      }, 1000);
+      // Store signup success message in sessionStorage so it persists across redirect
+      sessionStorage.setItem('signup_success', 'true');
+      
+      onOpenChange(false);
+      window.location.href = '/';
     } finally {
       console.log('[AUTH] Signup process completed, setting loading to false');
       setIsLoading(false);

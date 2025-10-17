@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Upload, User, Building2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ApprovalStatusBanner } from '@/components/ApprovalStatusBanner';
+import { toast as sonnerToast } from 'sonner';
 
 interface ProfileData {
   contact_person_name: string;
@@ -45,6 +46,18 @@ const Profile = () => {
   
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Check for signup success message from sessionStorage
+  useEffect(() => {
+    const signupSuccess = sessionStorage.getItem('signup_success');
+    if (signupSuccess === 'true') {
+      sessionStorage.removeItem('signup_success');
+      sonnerToast.success('Account Created!', {
+        description: 'Please check your email to verify your account.',
+        duration: 8000,
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (user) {

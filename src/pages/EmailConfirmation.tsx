@@ -20,8 +20,12 @@ export default function EmailConfirmation() {
     if (confirmationSuccess) {
       toast.success('Email Confirmed!', {
         description: 'Your email has been successfully verified.',
+        duration: 5000,
       });
-      navigate('/dashboard', { replace: true });
+      // Delay navigation to allow user to see the toast
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 2000);
     } else if (confirmationError) {
       handleConfirmationError(confirmationError, email);
     } else {
@@ -58,10 +62,10 @@ export default function EmailConfirmation() {
       } : undefined,
     });
 
-    // Redirect to dashboard after showing toast
+    // Delay redirect to allow user to see and interact with the toast
     setTimeout(() => {
       navigate('/dashboard', { replace: true });
-    }, 500);
+    }, 3000);
   };
 
   const handleResendConfirmation = async (userEmail: string) => {
