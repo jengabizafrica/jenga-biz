@@ -75,6 +75,12 @@ const Landing = () => {
           <div className="flex justify-between items-center py-4">
             <div className="flex-0" />
             <div className="flex items-center gap-2 overflow-auto sm:overflow-visible whitespace-nowrap landing-controls">
+              <img
+                alt="Jenga Biz Africa"
+                loading="lazy"
+                src="https://e7fdf1423f81446a993eb4bf0c13ff07-76d81d5979ce491580f1c8704.fly.dev/jenga-biz-logo.png"
+                className="landing-logo w-[70px] h-[70px] sm:w-auto sm:h-10 mr-1 sm:mr-0 block"
+              />
               <Button
                 variant="outline"
                 size="sm"
