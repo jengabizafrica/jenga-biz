@@ -420,28 +420,28 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
             )}
           </TabsList>
 
-          <TabsContent value="users" className="space-y-6 mt-6">
+          <TabsContent value="users" className="space-y-6">
             <UserManagement hideSuperAdmins={saasMode} />
           </TabsContent>
 
-          <TabsContent value="invites" className="space-y-6 mt-6">
+          <TabsContent value="invites" className="space-y-6">
             <InviteCodeManager />
           </TabsContent>
 
           {isSuperAdmin && (
-            <TabsContent value="approvals" className="space-y-6 mt-6">
+            <TabsContent value="approvals" className="space-y-6">
               <PendingApprovalsList />
             </TabsContent>
           )}
 
           {isSuperAdmin && (
-            <TabsContent value="templates" className="space-y-6 mt-6">
+            <TabsContent value="templates" className="space-y-6">
               <TemplatesManager />
             </TabsContent>
           )}
 
           {isSuperAdmin && (
-            <TabsContent value="settings" className="space-y-6 mt-6">
+            <TabsContent value="settings" className="space-y-6">
               <div className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -576,13 +576,13 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
           )}
 
           {isSuperAdmin && (
-            <TabsContent value="subscriptions" className="space-y-6 mt-6">
+            <TabsContent value="subscriptions" className="space-y-6">
               <SubscriptionPlansManager />
             </TabsContent>
           )}
 
           {isSuperAdmin && (
-            <TabsContent value="analytics" className="space-y-6 mt-6">
+            <TabsContent value="analytics" className="space-y-6">
               {/* Super Admin: list of organizations (hubs) for impersonation */}
               <HubsList />
             </TabsContent>
