@@ -3,6 +3,7 @@
 // checks here to keep the repo typecheckable locally.
 // @ts-ignore: Deno std import for runtime (ignored by Node tsc)
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 
 // Provide a fallback declaration so TypeScript in the editor doesn't error on `Deno`.
 declare const Deno: {
@@ -37,47 +38,36 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     let body: SignupEmailRequest;
-    
-    // Verify webhook signature if SEND_EMAIL_HOOK_SECRET is configured AND signature is provided
     const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
-    const signature = req.headers.get("webhook-signature");
     
-    if (hookSecret && signature) {
-      // Strip v1,whsec_ prefix if present
-      const actualSecret = hookSecret.startsWith("v1,whsec_") 
-        ? hookSecret.substring(9) 
-        : hookSecret;
-
-      // Read payload for verification
+    if (hookSecret) {
+      // Verify webhook signature using standardwebhooks library
       const payload = await req.text();
+      const headers = Object.fromEntries(req.headers);
+      const wh = new Webhook(hookSecret);
       
-      // Verify signature using HMAC
-      const expectedSig = await crypto.subtle.digest(
-        "SHA-256",
-        new TextEncoder().encode(actualSecret + payload)
-      );
-      const expectedSigHex = Array.from(new Uint8Array(expectedSig))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-
-      if (!signature.includes(expectedSigHex)) {
-        console.error("Invalid webhook signature");
+      try {
+        const webhookPayload = wh.verify(payload, headers) as any;
+        console.log("[send-signup-confirmation] Webhook verified successfully");
+        
+        // Extract email data from webhook payload
+        body = {
+          email: webhookPayload.user?.email || "",
+          token_hash: webhookPayload.email_data?.token_hash,
+          token: webhookPayload.email_data?.token,
+          email_action_type: webhookPayload.email_data?.email_action_type,
+          redirect_to: webhookPayload.email_data?.redirect_to,
+        };
+      } catch (error: any) {
+        console.error("[send-signup-confirmation] Webhook verification failed:", error.message);
         return new Response(
-          JSON.stringify({ error: "Invalid webhook signature" }),
+          JSON.stringify({ error: "Webhook verification failed" }),
           { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
-
-      // Parse body after successful verification
-      body = JSON.parse(payload);
-      console.log("Webhook signature verified successfully");
     } else {
-      // No signature verification - accept as auth hook or development mode
-      if (!signature && hookSecret) {
-        console.warn("SEND_EMAIL_HOOK_SECRET configured but no signature provided - accepting as Supabase auth hook");
-      } else if (!hookSecret) {
-        console.warn("SEND_EMAIL_HOOK_SECRET not configured, skipping webhook verification");
-      }
+      // No secret configured - accept without verification (development mode)
+      console.warn("[send-signup-confirmation] SEND_EMAIL_HOOK_SECRET not configured, skipping webhook verification");
       body = await req.json();
     }
 
