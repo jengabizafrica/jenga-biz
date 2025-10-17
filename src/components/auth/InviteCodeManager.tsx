@@ -264,7 +264,7 @@ export function InviteCodeManager({ hubId }: { hubId?: string | null } = {}) {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const resp = await fetch(`${functionsBase}/invite-codes?id=${encodeURIComponent(inviteToDelete.id)}`, {
+      const resp = await fetch(`${functionsBase}/invite-codes/${encodeURIComponent(inviteToDelete.id)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
