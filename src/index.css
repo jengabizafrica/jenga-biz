@@ -131,3 +131,17 @@ All colors MUST be HSL.
     flex-wrap: wrap !important;
   }
 }
+
+/* Additional responsive adjustments for <= 991px */
+@media (max-width: 991px) {
+  .landing-controls {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow: auto !important;
+  }
+  .landing-logo {
+    width: 70px !important;
+    height: 70px !important;
+    margin-right: 5px !important;
+  }
+}
