@@ -376,43 +376,46 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
 
         {/* Main Dashboard Content */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="max-[991px]:flex max-[991px]:flex-row max-[991px]:flex-wrap">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:flex lg:w-auto gap-1">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              User Management
+              <span className="hidden sm:inline">User Management</span>
+              <span className="sm:hidden">Users</span>
             </TabsTrigger>
             <TabsTrigger value="invites" className="flex items-center gap-2">
               <PlusCircle className="h-4 w-4" />
-              Invite Codes
+              <span className="hidden sm:inline">Invite Codes</span>
+              <span className="sm:hidden">Invites</span>
             </TabsTrigger>
             {isSuperAdmin && (
               <TabsTrigger value="approvals" className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                Approvals
+                <span>Approvals</span>
               </TabsTrigger>
             )}
             {isSuperAdmin && (
               <TabsTrigger value="templates" className="flex items-center gap-2">
                 <Building className="h-4 w-4" />
-                Templates
+                <span>Templates</span>
               </TabsTrigger>
             )}
             {isSuperAdmin && (
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
-                Settings
+                <span>Settings</span>
               </TabsTrigger>
             )}
             {isSuperAdmin && (
               <TabsTrigger value="subscriptions" className="flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
-                Subscription Plans
+                <span className="hidden sm:inline">Subscription Plans</span>
+                <span className="sm:hidden">Plans</span>
               </TabsTrigger>
             )}
             {isSuperAdmin && (
               <TabsTrigger value="analytics" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
-                Analytics
+                <span>Analytics</span>
               </TabsTrigger>
             )}
           </TabsList>
