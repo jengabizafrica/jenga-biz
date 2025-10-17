@@ -57,55 +57,57 @@ export function PendingApprovalsList() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Pending Approvals</CardTitle>
-        <CardDescription>Review and act on pending ecosystem enabler signups.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading approvals...
-          </div>
-        )}
-        {!loading && items.length === 0 && (
-          <div className="text-sm text-muted-foreground">No pending approvals.</div>
-        )}
-        {!loading && items.length > 0 && (
-          <div className="space-y-3">
-            {items.map((it) => (
-              <div key={it.id} className="border rounded-md p-3 flex items-center justify-between">
-                <div className="space-y-1">
-                  <div className="font-medium">{it.type.replace('_', ' ')}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Request ID: {it.id} • User: {it.user_id} • Submitted: {new Date(it.created_at).toLocaleString()}
+    <div className="space-y-6 mt-[120px] lg:mt-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Pending Approvals</CardTitle>
+          <CardDescription>Review and act on pending ecosystem enabler signups.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading approvals...
+            </div>
+          )}
+          {!loading && items.length === 0 && (
+            <div className="text-sm text-muted-foreground">No pending approvals.</div>
+          )}
+          {!loading && items.length > 0 && (
+            <div className="space-y-3">
+              {items.map((it) => (
+                <div key={it.id} className="border rounded-md p-3 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="font-medium">{it.type.replace('_', ' ')}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Request ID: {it.id} • User: {it.user_id} • Submitted: {new Date(it.created_at).toLocaleString()}
+                    </div>
+                    {it.payload?.org_name && (
+                      <div className="text-sm">Org: {it.payload.org_name}</div>
+                    )}
                   </div>
-                  {it.payload?.org_name && (
-                    <div className="text-sm">Org: {it.payload.org_name}</div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleApprove(it.id)}
+                      disabled={actioning === it.id}
+                    >
+                      {actioning === it.id ? 'Approving...' : 'Approve'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleReject(it.id)}
+                      disabled={actioning === it.id}
+                    >
+                      {actioning === it.id ? 'Rejecting...' : 'Reject'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleApprove(it.id)}
-                    disabled={actioning === it.id}
-                  >
-                    {actioning === it.id ? 'Approving...' : 'Approve'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleReject(it.id)}
-                    disabled={actioning === it.id}
-                  >
-                    {actioning === it.id ? 'Rejecting...' : 'Reject'}
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -136,13 +136,13 @@ export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAd
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 mt-[120px] lg:mt-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">User Management</h2>
-          <p className="text-muted-foreground">Manage user accounts and permissions</p>
-        </div>
+        <div />
       </div>
+
+      <div className="text-2xl font-bold leading-8">User Management</div>
+      <div className="text-slate-500 font-normal">Manage user accounts and permissions</div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

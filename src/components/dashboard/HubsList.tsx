@@ -67,7 +67,7 @@ export const HubsList: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="space-y-6 mt-[120px] lg:mt-6">
       <Card>
         <CardHeader>
           <CardTitle>Organizations</CardTitle>

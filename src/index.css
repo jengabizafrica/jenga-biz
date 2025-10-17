@@ -102,18 +102,46 @@ All colors MUST be HSL.
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 1;
   }
-  
+
   .line-clamp-2 {
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }
-  
+
   .line-clamp-3 {
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+  }
+}
+
+/* Landing header responsive adjustments for screens <= 640px */
+@media (max-width: 640px) {
+  .landing-header {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+  .landing-wrapper {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+}
+
+/* Additional responsive adjustments for <= 991px */
+@media (max-width: 991px) {
+  .landing-controls {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow: auto !important;
+  }
+  .landing-logo {
+    width: 70px !important;
+    height: 70px !important;
+    margin-right: 5px !important;
   }
 }
