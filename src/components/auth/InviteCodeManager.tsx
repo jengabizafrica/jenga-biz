@@ -254,7 +254,7 @@ export function InviteCodeManager({ hubId }: { hubId?: string | null } = {}) {
         if (metaEnv.VITE_SUPABASE_FUNCTIONS_URL) return metaEnv.VITE_SUPABASE_FUNCTIONS_URL;
         const ref = metaEnv.VITE_SUPABASE_PROJECT_REF || metaEnv.VITE_SUPABASE_PROJECT_ID;
         if (ref) return `https://${ref}.functions.supabase.co`;
-        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || '';
+        const supabaseUrl = metaEnv.VITE_SUPABASE_URL || (window as any).VITE_SUPABASE_URL || SUPABASE_URL || '';
         if (supabaseUrl) return `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
         return window.location.origin;
       };
