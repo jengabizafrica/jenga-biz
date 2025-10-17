@@ -278,10 +278,14 @@ const handler = async (req: Request): Promise<Response> => {
       confirmationUrl = `${functionUrl}?redirect_to=${encodeURIComponent(redirectTo)}`;
     }
 
+    // Calculate expiration time (24 hours from now as per your setting)
+    const expirationHours = 24;
+    const expirationMinutes = expirationHours * 60;
+
     const subject = body.subject ||
       "Welcome to Jenga Biz Africa - Confirm Your Email";
     const text = body.text ||
-      `Please confirm your email by visiting: ${confirmationUrl}`;
+      `Please confirm your email by visiting: ${confirmationUrl}\n\nThis link will expire in ${expirationHours} hours for security reasons.`;
     const html = body.html || `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background-color: #f97316; padding: 8px 20px 14px 20px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -306,6 +310,12 @@ const handler = async (req: Request): Promise<Response> => {
               </a>
             </div>
             
+            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 4px;">
+              <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.5;">
+                <strong>⏰ Important:</strong> This confirmation link will expire in <strong>${expirationHours} hours</strong> for security reasons. Please confirm your email soon.
+              </p>
+            </div>
+            
             <p style="color: #6b7280; margin-bottom: 20px; line-height: 1.6;">
               If the button doesn't work, you can also copy and paste this link into your browser:
             </p>
@@ -315,6 +325,15 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
             
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+            
+            <div style="background-color: #f0f9ff; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+              <p style="color: #1e40af; margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">
+                Having trouble?
+              </p>
+              <p style="color: #3b82f6; margin: 0; font-size: 13px; line-height: 1.5;">
+                If your link expires, simply log in to your account and request a new confirmation email from your dashboard.
+              </p>
+            </div>
             
             <p style="color: #9ca3af; font-size: 12px; margin-bottom: 10px;">
               If you didn't create an account with Jenga Biz Africa, you can safely ignore this email.

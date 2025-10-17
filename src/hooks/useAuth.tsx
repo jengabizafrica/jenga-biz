@@ -26,6 +26,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
       setLoading(false);
       console.log('[useAuth] auth state changed:', session?.user?.email || null);
+      
+      // Check email confirmation status and show toast if needed
+      if (session?.user) {
+        setTimeout(async () => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('email_confirmed')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (profile && !profile.email_confirmed) {
+            const { toast } = await import('sonner');
+            toast.warning('Please Confirm Your Email', {
+              description: 'Check your inbox for a confirmation email to secure your account.',
+              duration: 8000,
+              action: {
+                label: 'Resend',
+                onClick: async () => {
+                  const { error } = await supabase.functions.invoke('resend-confirmation', {
+                    body: { email: session.user.email },
+                  });
+                  
+                  if (error) {
+                    toast.error('Failed to resend', {
+                      description: error.message?.includes('Rate limit') 
+                        ? 'Too many requests. Please try again later.'
+                        : 'Please try again.',
+                    });
+                  } else {
+                    toast.success('Confirmation email sent!', {
+                      description: 'Please check your inbox.',
+                    });
+                  }
+                },
+              },
+            });
+          }
+        }, 0);
+      }
     });
 
     // THEN check for existing session
