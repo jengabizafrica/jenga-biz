@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, LogIn, UserPlus } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { EnhancedAuthDialog } from '@/components/auth/EnhancedAuthDialog';
+import { CurrencySelector } from '@/components/CurrencySelector';
+import { useCurrencies } from '@/hooks/useCurrencies';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +44,7 @@ export default function Pricing() {
   const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
   const [selectedCycles, setSelectedCycles] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  const { selectedCurrency, changeCurrency, currentCurrency } = useCurrencies();
 
   const fetchPlans = async () => {
     try {
@@ -111,6 +114,18 @@ export default function Pricing() {
 
   const getDisplayPrice = (plan: Plan) => {
     const cycle = selectedCycles[plan.id] || plan.billing_cycle;
+    const key = `${cycle}-${selectedCurrency}`;
+    
+    // Try to get price for selected cycle and currency
+    if (plan.prices && plan.prices[key]) {
+      return {
+        price: plan.prices[key].price,
+        currency: plan.prices[key].currency,
+        cycle,
+      };
+    }
+    
+    // Fallback to cycle-only key
     if (plan.prices && plan.prices[cycle]) {
       return {
         price: plan.prices[cycle].price,
@@ -118,6 +133,8 @@ export default function Pricing() {
         cycle,
       };
     }
+    
+    // Final fallback to default plan price
     return {
       price: plan.price,
       currency: plan.currency,
@@ -147,6 +164,14 @@ export default function Pricing() {
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold">Pricing</h1>
         <p className="text-muted-foreground mt-2">Development pricing is set to 1 KES for paid tiers.</p>
+        
+        <div className="mt-6 max-w-xs mx-auto">
+          <CurrencySelector 
+            value={selectedCurrency}
+            onValueChange={changeCurrency}
+            label="Select Currency"
+          />
+        </div>
         
         {error && (
           <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg text-red-600 dark:text-red-400">
@@ -202,9 +227,13 @@ export default function Pricing() {
                   )}
                   <div className="mb-4">
                     <div className="text-3xl font-semibold">
-                      {displayPrice.currency} {Number(displayPrice.price).toFixed(2)}
+                      {currentCurrency.symbol} {Number(displayPrice.price).toFixed(2)}
                     </div>
-                    <div className="text-sm text-muted-foreground capitalize">{displayPrice.cycle}</div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="capitalize">{displayPrice.cycle}</span>
+                      <span className="mx-1">•</span>
+                      <span>{displayPrice.currency}</span>
+                    </div>
                   </div>
                   {isFree ? (
                     <Button variant="outline" className="w-full" disabled>
