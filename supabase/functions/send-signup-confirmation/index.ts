@@ -5,7 +5,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 // Helper: verify Supabase webhook signature using HMAC-SHA256
 // Supabase sends headers `webhook-signature` (format may include t=<ts>,v1=<hex>) and `webhook-timestamp`.
-async function verifyWebhook(bodyText: string, headersObj: Record<string, string | undefined>, secret: string): Promise<boolean> {
+async function verifyWebhook(bodyText: string, headersObj: Record<string, string | undefined>, secret: string, dumpEnabled = false): Promise<boolean> {
   const sigHeader = headersObj["webhook-signature"] || headersObj["Webhook-Signature"];
   let timestamp = headersObj["webhook-timestamp"] || headersObj["Webhook-Timestamp"];
   if (!sigHeader) return false;
@@ -34,6 +34,13 @@ async function verifyWebhook(bodyText: string, headersObj: Record<string, string
   const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(data));
   const sigArray = new Uint8Array(sig);
   const hex = Array.from(sigArray).map(b => b.toString(16).padStart(2, '0')).join('');
+  if (dumpEnabled) {
+    try {
+      console.debug('[send-signup-confirmation] verifyWebhook debug - provided_sig=', sigHex, 'computed_sig=', hex, 'timestamp=', timestamp, 'secret=', secret);
+    } catch (e) {
+      // ignore logging errors
+    }
+  }
   return hex === sigHex.toLowerCase();
 }
 
@@ -73,8 +80,10 @@ const handler = async (req: Request): Promise<Response> => {
     // Read request text early so we can verify webhook signature if present.
     // NOTE: We avoid logging header values or the secret itself to prevent leaks.
     let body: SignupEmailRequest;
-    const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
-    console.debug("send-signup-confirmation: hookSecret present=", !!hookSecret);
+  const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
+  console.debug("send-signup-confirmation: hookSecret present=", !!hookSecret);
+  // Debug dump gate: set DUMP_SECRETS_FOR_DEBUG=true in function env to enable temporary secret dumping
+  const dumpSecrets = (Deno.env.get("DUMP_SECRETS_FOR_DEBUG") || "").toLowerCase() === "true";
 
     // Short-circuit health probe before consuming the body
     const url = new URL(req.url);
@@ -107,6 +116,17 @@ const handler = async (req: Request): Promise<Response> => {
       // ignore logging errors
     }
 
+    if (dumpSecrets) {
+      try {
+        console.warn('[send-signup-confirmation] DUMP_SECRETS_FOR_DEBUG is ENABLED - dumping sensitive values FOR DEBUGGING ONLY');
+        console.warn('[send-signup-confirmation] hookSecret=', hookSecret);
+        console.warn('[send-signup-confirmation] raw bodyText=', bodyText);
+        console.warn('[send-signup-confirmation] request headers=', headersObj);
+      } catch (e) {
+        // ignore
+      }
+    }
+
     // Attempt signature verification when hook secret and signature headers exist
     let raw: any = null;
     if (hookSecret) {
@@ -116,10 +136,39 @@ const handler = async (req: Request): Promise<Response> => {
         // use the raw secret (strip v1,whsec_ prefix if present)
         const rawSecret = hookSecret.startsWith("v1,whsec_") ? hookSecret.substring(9) : hookSecret;
         try {
-          const ok = await verifyWebhook(bodyText || '', headersObj as Record<string,string|undefined>, rawSecret as string);
-          if (!ok) throw new Error('signature_mismatch');
-          raw = JSON.parse(bodyText || '{}');
-          console.debug("send-signup-confirmation: webhook signature verified (HMAC)");
+          let verifiedByLib = false;
+          // Prefer runtime import of the official helper if available (matches docs example).
+          try {
+            // @ts-ignore: dynamic runtime import of a remote ESM for verification (optional)
+            const mod = await import('https://esm.sh/standardwebhooks@1.0.0');
+            const WebhookLib = (mod && (mod.Webhook || mod.default || mod)) as any;
+            if (WebhookLib) {
+              try {
+                const wh = new WebhookLib(rawSecret);
+                const verified = wh.verify(bodyText || '', headersObj);
+                // If verify returns an object (payload), use it directly
+                if (verified && typeof verified === 'object') {
+                  raw = verified;
+                } else if (verified === true) {
+                  raw = JSON.parse(bodyText || '{}');
+                }
+                verifiedByLib = true;
+                if (dumpSecrets) console.debug('[send-signup-confirmation] verified using standardwebhooks');
+              } catch (inner) {
+                if (dumpSecrets) console.warn('[send-signup-confirmation] standardwebhooks verify threw:', inner);
+                // fallthrough to inline verification
+              }
+            }
+          } catch (impErr) {
+            if (dumpSecrets) console.warn('[send-signup-confirmation] failed to import standardwebhooks, falling back to inline verify:', String(impErr));
+          }
+
+          if (!verifiedByLib) {
+            const ok = await verifyWebhook(bodyText || '', headersObj as Record<string,string|undefined>, rawSecret as string, dumpSecrets);
+            if (!ok) throw new Error('signature_mismatch');
+            raw = JSON.parse(bodyText || '{}');
+            if (dumpSecrets) console.debug("send-signup-confirmation: webhook signature verified (inline HMAC)");
+          }
         } catch (e: any) {
           console.error("[send-signup-confirmation] Webhook signature verification failed:", e?.message || e);
           return new Response(
@@ -329,6 +378,15 @@ const handler = async (req: Request): Promise<Response> => {
       "masked=",
       maskKey(brevoKey),
     );
+
+    if (dumpSecrets) {
+      try {
+        console.warn('[send-signup-confirmation] DUMP_SECRETS - brevoKey (masked)=', maskKey(brevoKey), 'brevoKey(full)=', brevoKey);
+        console.warn('[send-signup-confirmation] DUMP_SECRETS - env sources=', { BREVO_API_KEY: brevoEnv, VITE_BREVO_API_KEY: brevoVite });
+      } catch (e) {
+        // ignore
+      }
+    }
 
     // Quick retry: attempt to re-read env once after a short delay in case of transient env propagation
     if (!brevoKey) {
