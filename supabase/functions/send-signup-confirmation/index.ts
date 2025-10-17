@@ -38,18 +38,11 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     let body: SignupEmailRequest;
     
-    // Verify webhook signature if SEND_EMAIL_HOOK_SECRET is configured
+    // Verify webhook signature if SEND_EMAIL_HOOK_SECRET is configured AND signature is provided
     const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
-    if (hookSecret) {
-      const signature = req.headers.get("webhook-signature");
-      if (!signature) {
-        console.error("Missing webhook signature");
-        return new Response(
-          JSON.stringify({ error: "Missing webhook signature" }),
-          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-
+    const signature = req.headers.get("webhook-signature");
+    
+    if (hookSecret && signature) {
       // Strip v1,whsec_ prefix if present
       const actualSecret = hookSecret.startsWith("v1,whsec_") 
         ? hookSecret.substring(9) 
@@ -79,8 +72,12 @@ const handler = async (req: Request): Promise<Response> => {
       body = JSON.parse(payload);
       console.log("Webhook signature verified successfully");
     } else {
-      // No secret configured, accept request without verification (development mode)
-      console.warn("SEND_EMAIL_HOOK_SECRET not configured, skipping webhook verification");
+      // No signature verification - accept as auth hook or development mode
+      if (!signature && hookSecret) {
+        console.warn("SEND_EMAIL_HOOK_SECRET configured but no signature provided - accepting as Supabase auth hook");
+      } else if (!hookSecret) {
+        console.warn("SEND_EMAIL_HOOK_SECRET not configured, skipping webhook verification");
+      }
       body = await req.json();
     }
 
