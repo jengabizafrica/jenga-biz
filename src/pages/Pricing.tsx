@@ -23,6 +23,8 @@ interface Plan {
   price: number;
   currency: string;
   billing_cycle: string;
+  prices?: Record<string, { price: number; currency: string }>;
+  available_cycles?: string[];
   features: Record<string, any>;
   is_active: boolean;
 }
@@ -38,6 +40,7 @@ export default function Pricing() {
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [showEnhancedAuth, setShowEnhancedAuth] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
+  const [selectedCycles, setSelectedCycles] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const fetchPlans = async () => {
@@ -47,6 +50,17 @@ export default function Pricing() {
       const list = await apiClient.listPlans();
       const normalized = (Array.isArray(list) ? list : []).filter((p: any) => p.is_active);
       setPlans(normalized);
+      
+      // Initialize selected cycles for each plan
+      const initialCycles: Record<string, string> = {};
+      normalized.forEach((plan: Plan) => {
+        if (plan.available_cycles && plan.available_cycles.length > 0) {
+          initialCycles[plan.id] = plan.available_cycles[0];
+        } else {
+          initialCycles[plan.id] = plan.billing_cycle || 'monthly';
+        }
+      });
+      setSelectedCycles(initialCycles);
     } catch (e: any) {
       const msg = e?.error?.message || 'Failed to load pricing plans. Please try again.';
       console.error('Error loading plans:', e);
@@ -79,7 +93,9 @@ export default function Pricing() {
 
     try {
       setBusyPlan(planId);
-      const ret = await apiClient.initiatePaystack(planId, `${window.location.origin}/billing/return`);
+      const selectedCycle = selectedCycles[planId];
+      // Pass selected billing cycle to backend (will need to update edge function to accept this)
+      const ret = await apiClient.initiatePaystack(planId, `${window.location.origin}/billing/return?cycle=${selectedCycle}`);
       if (ret?.authorization_url) {
         window.location.href = ret.authorization_url;
       } else {
@@ -91,6 +107,22 @@ export default function Pricing() {
     } finally {
       setBusyPlan(null);
     }
+  };
+
+  const getDisplayPrice = (plan: Plan) => {
+    const cycle = selectedCycles[plan.id] || plan.billing_cycle;
+    if (plan.prices && plan.prices[cycle]) {
+      return {
+        price: plan.prices[cycle].price,
+        currency: plan.prices[cycle].currency,
+        cycle,
+      };
+    }
+    return {
+      price: plan.price,
+      currency: plan.currency,
+      cycle: plan.billing_cycle,
+    };
   };
 
   const navigateTo = (path: string) => {
@@ -139,7 +171,10 @@ export default function Pricing() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {plans.map((plan) => {
-            const isFree = Number(plan.price) === 0;
+            const displayPrice = getDisplayPrice(plan);
+            const isFree = Number(displayPrice.price) === 0;
+            const hasMultipleCycles = plan.available_cycles && plan.available_cycles.length > 1;
+            
             return (
               <Card key={plan.id}>
                 <CardHeader>
@@ -147,11 +182,29 @@ export default function Pricing() {
                   <CardDescription>{plan.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {hasMultipleCycles && (
+                    <div className="mb-4">
+                      <label className="text-sm font-medium mb-2 block">Billing Cycle</label>
+                      <div className="flex gap-2">
+                        {(plan.available_cycles || []).map((cycle) => (
+                          <Button
+                            key={cycle}
+                            variant={selectedCycles[plan.id] === cycle ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSelectedCycles(prev => ({ ...prev, [plan.id]: cycle }))}
+                            className="flex-1 capitalize"
+                          >
+                            {cycle}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="mb-4">
                     <div className="text-3xl font-semibold">
-                      {plan.currency} {Number(plan.price).toFixed(2)}
+                      {displayPrice.currency} {Number(displayPrice.price).toFixed(2)}
                     </div>
-                    <div className="text-sm text-muted-foreground">{plan.billing_cycle}</div>
+                    <div className="text-sm text-muted-foreground capitalize">{displayPrice.cycle}</div>
                   </div>
                   {isFree ? (
                     <Button variant="outline" className="w-full" disabled>

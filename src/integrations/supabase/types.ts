@@ -1107,6 +1107,7 @@ export type Database = {
       }
       subscription_plans: {
         Row: {
+          available_cycles: string[] | null
           billing_cycle: string
           created_at: string
           currency: string
@@ -1116,9 +1117,11 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          prices: Json | null
           updated_at: string
         }
         Insert: {
+          available_cycles?: string[] | null
           billing_cycle?: string
           created_at?: string
           currency?: string
@@ -1128,9 +1131,11 @@ export type Database = {
           is_active?: boolean
           name: string
           price: number
+          prices?: Json | null
           updated_at?: string
         }
         Update: {
+          available_cycles?: string[] | null
           billing_cycle?: string
           created_at?: string
           currency?: string
@@ -1140,6 +1145,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number
+          prices?: Json | null
           updated_at?: string
         }
         Relationships: []
@@ -1336,32 +1342,38 @@ export type Database = {
       }
       user_subscriptions: {
         Row: {
+          billing_cycle: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
           id: string
           paystack_subscription_id: string | null
           plan_id: string
+          price_paid: number | null
           status: string
           user_id: string
         }
         Insert: {
+          billing_cycle?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
           paystack_subscription_id?: string | null
           plan_id: string
+          price_paid?: number | null
           status?: string
           user_id: string
         }
         Update: {
+          billing_cycle?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
           id?: string
           paystack_subscription_id?: string | null
           plan_id?: string
+          price_paid?: number | null
           status?: string
           user_id?: string
         }

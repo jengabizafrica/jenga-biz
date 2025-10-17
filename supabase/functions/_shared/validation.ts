@@ -173,12 +173,20 @@ export const consumeInviteCodeSchema = z.object({
 // Subscription & Payments Schemas
 // ==========================================
 
+// Price configuration for a billing cycle
+const priceConfigSchema = z.object({
+  price: z.number().nonnegative(),
+  currency: z.string().length(3).default("KES"),
+});
+
 export const subscriptionPlanSchema = z.object({
   name: z.string().min(2).max(100),
   description: z.string().max(500).optional(),
-  price: z.number().nonnegative(),
-  currency: z.string().length(3).default("KES"),
-  billing_cycle: z.enum(["monthly", "yearly"]).default("monthly"),
+  price: z.number().nonnegative().optional(), // Legacy field for backward compatibility
+  currency: z.string().length(3).default("KES").optional(), // Legacy field
+  billing_cycle: z.enum(["monthly", "quarterly", "yearly"]).default("monthly").optional(), // Legacy field
+  prices: z.record(priceConfigSchema).optional(), // New: { monthly: { price, currency }, quarterly: {...}, yearly: {...} }
+  available_cycles: z.array(z.enum(["monthly", "quarterly", "yearly"])).optional(), // New: list of enabled cycles
   features: z.record(z.unknown()).default({}),
   is_active: z.boolean().default(true),
 });

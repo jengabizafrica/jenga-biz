@@ -20,10 +20,18 @@ interface SubscriptionPlan {
   price: number;
   currency: string;
   billing_cycle: string;
+  prices: Record<string, { price: number; currency: string }>;
+  available_cycles: string[];
   features: Record<string, any>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+interface PriceConfig {
+  monthly?: { price: number; currency: string };
+  quarterly?: { price: number; currency: string };
+  yearly?: { price: number; currency: string };
 }
 
 export function SubscriptionPlansManager() {
@@ -43,6 +51,11 @@ export function SubscriptionPlansManager() {
     billing_cycle: 'monthly',
     features: {} as Record<string, any>,
     is_active: true,
+  });
+
+  // New pricing state for multiple billing cycles
+  const [priceConfig, setPriceConfig] = useState<PriceConfig>({
+    monthly: { price: 0, currency: 'KES' },
   });
 
   useEffect(() => {
@@ -76,11 +89,19 @@ export function SubscriptionPlansManager() {
       features: {},
       is_active: true,
     });
+    setPriceConfig({
+      monthly: { price: 0, currency: 'KES' },
+    });
   };
 
   const handleCreate = async () => {
     try {
-      await apiClient.createPlan(formData);
+      const available_cycles = Object.keys(priceConfig) as string[];
+      await apiClient.createPlan({
+        ...formData,
+        prices: priceConfig,
+        available_cycles,
+      } as any);
       toast({
         title: 'Success',
         description: 'Subscription plan created successfully',
@@ -101,7 +122,12 @@ export function SubscriptionPlansManager() {
     if (!editingPlan) return;
     
     try {
-      await apiClient.updatePlan(editingPlan.id, formData);
+      const available_cycles = Object.keys(priceConfig) as string[];
+      await apiClient.updatePlan(editingPlan.id, {
+        ...formData,
+        prices: priceConfig,
+        available_cycles,
+      } as any);
       toast({
         title: 'Success',
         description: 'Subscription plan updated successfully',
@@ -147,7 +173,37 @@ export function SubscriptionPlansManager() {
       features: plan.features,
       is_active: plan.is_active,
     });
+    // Load existing prices or fallback to single price
+    if (plan.prices && Object.keys(plan.prices).length > 0) {
+      setPriceConfig(plan.prices as PriceConfig);
+    } else {
+      setPriceConfig({
+        [plan.billing_cycle]: { price: plan.price, currency: plan.currency },
+      } as PriceConfig);
+    }
     setIsEditDialogOpen(true);
+  };
+
+  const updatePriceConfig = (cycle: 'monthly' | 'quarterly' | 'yearly', field: 'price' | 'currency', value: any) => {
+    setPriceConfig(prev => ({
+      ...prev,
+      [cycle]: {
+        ...prev[cycle],
+        [field]: field === 'price' ? parseFloat(value) || 0 : value,
+      } as { price: number; currency: string },
+    }));
+  };
+
+  const toggleBillingCycle = (cycle: 'monthly' | 'quarterly' | 'yearly') => {
+    setPriceConfig(prev => {
+      const newConfig = { ...prev };
+      if (newConfig[cycle]) {
+        delete newConfig[cycle];
+      } else {
+        newConfig[cycle] = { price: 0, currency: 'KES' };
+      }
+      return newConfig;
+    });
   };
 
   const formatPrice = (price: number, currency: string) => {
@@ -207,44 +263,54 @@ export function SubscriptionPlansManager() {
                   placeholder="Plan description"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="price">Price</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="currency">Currency</Label>
-                  <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="KES">KES</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              
+              {/* Multiple Billing Cycles */}
+              <div className="space-y-3">
+                <Label>Billing Cycles & Pricing</Label>
+                
+                {(['monthly', 'quarterly', 'yearly'] as const).map((cycle) => (
+                  <div key={cycle} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={!!priceConfig[cycle]}
+                          onCheckedChange={() => toggleBillingCycle(cycle)}
+                        />
+                        <Label className="capitalize">{cycle}</Label>
+                      </div>
+                    </div>
+                    {priceConfig[cycle] && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Price"
+                            value={priceConfig[cycle]?.price || 0}
+                            onChange={(e) => updatePriceConfig(cycle, 'price', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Select 
+                            value={priceConfig[cycle]?.currency || 'KES'} 
+                            onValueChange={(value) => updatePriceConfig(cycle, 'currency', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="KES">KES</SelectItem>
+                              <SelectItem value="USD">USD</SelectItem>
+                              <SelectItem value="EUR">EUR</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div>
-                <Label htmlFor="billing_cycle">Billing Cycle</Label>
-                <Select value={formData.billing_cycle} onValueChange={(value) => setFormData({ ...formData, billing_cycle: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
               <div className="flex items-center space-x-2">
                 <Switch
                   id="is_active"
@@ -311,15 +377,25 @@ export function SubscriptionPlansManager() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />
-                  {formatPrice(plan.price, plan.currency)}
+              <div className="space-y-2">
+                {plan.prices && Object.keys(plan.prices).length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {Object.entries(plan.prices).map(([cycle, priceData]: [string, any]) => (
+                      <Badge key={cycle} variant="outline" className="flex items-center gap-1">
+                        <DollarSign className="h-3 w-3" />
+                        {formatPrice(priceData.price, priceData.currency)} / {cycle}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <DollarSign className="h-4 w-4" />
+                    {formatPrice(plan.price, plan.currency)} / {plan.billing_cycle}
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground">
+                  Created {new Date(plan.created_at).toLocaleDateString()}
                 </div>
-                <div>•</div>
-                <div>{plan.billing_cycle}</div>
-                <div>•</div>
-                <div>Created {new Date(plan.created_at).toLocaleDateString()}</div>
               </div>
             </CardContent>
           </Card>
@@ -354,44 +430,54 @@ export function SubscriptionPlansManager() {
                 placeholder="Plan description"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-price">Price</Label>
-                <Input
-                  id="edit-price"
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-currency">Currency</Label>
-                <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="KES">KES</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            
+            {/* Multiple Billing Cycles */}
+            <div className="space-y-3">
+              <Label>Billing Cycles & Pricing</Label>
+              
+              {(['monthly', 'quarterly', 'yearly'] as const).map((cycle) => (
+                <div key={cycle} className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={!!priceConfig[cycle]}
+                        onCheckedChange={() => toggleBillingCycle(cycle)}
+                      />
+                      <Label className="capitalize">{cycle}</Label>
+                    </div>
+                  </div>
+                  {priceConfig[cycle] && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Price"
+                          value={priceConfig[cycle]?.price || 0}
+                          onChange={(e) => updatePriceConfig(cycle, 'price', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Select 
+                          value={priceConfig[cycle]?.currency || 'KES'} 
+                          onValueChange={(value) => updatePriceConfig(cycle, 'currency', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="KES">KES</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-            <div>
-              <Label htmlFor="edit-billing_cycle">Billing Cycle</Label>
-              <Select value={formData.billing_cycle} onValueChange={(value) => setFormData({ ...formData, billing_cycle: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="flex items-center space-x-2">
               <Switch
                 id="edit-is_active"

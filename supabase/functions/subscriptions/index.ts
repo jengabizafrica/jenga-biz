@@ -116,17 +116,41 @@ async function createPlan(req: Request): Promise<Response> {
     typeof subscriptionPlanSchema
   >;
 
+  // Support both new (prices) and legacy (price/billing_cycle) formats
+  const insertData: any = {
+    name: payload.name,
+    description: payload.description ?? null,
+    features: payload.features,
+    is_active: payload.is_active,
+  };
+
+  // Handle new multi-cycle pricing
+  if (payload.prices && Object.keys(payload.prices).length > 0) {
+    insertData.prices = payload.prices;
+    insertData.available_cycles = payload.available_cycles || Object.keys(payload.prices);
+    // Set legacy fields from first available cycle for backward compatibility
+    const firstCycle = Object.keys(payload.prices)[0] as string;
+    const firstPrice = payload.prices[firstCycle];
+    insertData.price = firstPrice.price;
+    insertData.currency = firstPrice.currency;
+    insertData.billing_cycle = firstCycle;
+  } else {
+    // Legacy single-price format
+    insertData.price = payload.price ?? 0;
+    insertData.currency = payload.currency ?? "KES";
+    insertData.billing_cycle = payload.billing_cycle ?? "monthly";
+    insertData.prices = {
+      [insertData.billing_cycle]: {
+        price: insertData.price,
+        currency: insertData.currency,
+      },
+    };
+    insertData.available_cycles = [insertData.billing_cycle];
+  }
+
   const { data, error } = await supabase
     .from("subscription_plans")
-    .insert({
-      name: payload.name,
-      description: payload.description ?? null,
-      price: payload.price,
-      currency: payload.currency,
-      billing_cycle: payload.billing_cycle,
-      features: payload.features,
-      is_active: payload.is_active,
-    })
+    .insert(insertData)
     .select("*")
     .single();
 
@@ -156,9 +180,44 @@ async function updatePlan(req: Request): Promise<Response> {
     updateSubscriptionPlanSchema,
   ) as z.infer<typeof updateSubscriptionPlanSchema>;
 
+  // Prepare update data
+  const updateData: any = {};
+  
+  if (payload.name !== undefined) updateData.name = payload.name;
+  if (payload.description !== undefined) updateData.description = payload.description;
+  if (payload.features !== undefined) updateData.features = payload.features;
+  if (payload.is_active !== undefined) updateData.is_active = payload.is_active;
+
+  // Handle new multi-cycle pricing
+  if (payload.prices && Object.keys(payload.prices).length > 0) {
+    updateData.prices = payload.prices;
+    updateData.available_cycles = payload.available_cycles || Object.keys(payload.prices);
+    // Update legacy fields from first available cycle for backward compatibility
+    const firstCycle = Object.keys(payload.prices)[0] as string;
+    const firstPrice = payload.prices[firstCycle];
+    updateData.price = firstPrice.price;
+    updateData.currency = firstPrice.currency;
+    updateData.billing_cycle = firstCycle;
+  } else if (payload.price !== undefined || payload.currency !== undefined || payload.billing_cycle !== undefined) {
+    // Legacy single-price update
+    if (payload.price !== undefined) updateData.price = payload.price;
+    if (payload.currency !== undefined) updateData.currency = payload.currency;
+    if (payload.billing_cycle !== undefined) updateData.billing_cycle = payload.billing_cycle;
+    
+    // Also update prices JSONB to match
+    const cycle = payload.billing_cycle ?? "monthly";
+    updateData.prices = {
+      [cycle]: {
+        price: payload.price ?? 0,
+        currency: payload.currency ?? "KES",
+      },
+    };
+    updateData.available_cycles = [cycle];
+  }
+
   const { data, error } = await supabase
     .from("subscription_plans")
-    .update(payload as any)
+    .update(updateData)
     .eq("id", id)
     .select("*")
     .single();
