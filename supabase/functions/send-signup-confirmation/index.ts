@@ -3,7 +3,7 @@
 // checks here to keep the repo typecheckable locally.
 // @ts-ignore: Deno std import for runtime (ignored by Node tsc)
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
+
 
 // Provide a fallback declaration so TypeScript in the editor doesn't error on `Deno`.
 declare const Deno: {
@@ -39,36 +39,41 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     let body: SignupEmailRequest;
     const hookSecret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
-    
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+
     if (hookSecret) {
-      // Verify webhook signature using standardwebhooks library
-      const payload = await req.text();
-      const headers = Object.fromEntries(req.headers);
-      const wh = new Webhook(hookSecret);
-      
-      try {
-        const webhookPayload = wh.verify(payload, headers) as any;
-        console.log("[send-signup-confirmation] Webhook verified successfully");
-        
-        // Extract email data from webhook payload
-        body = {
-          email: webhookPayload.user?.email || "",
-          token_hash: webhookPayload.email_data?.token_hash,
-          token: webhookPayload.email_data?.token,
-          email_action_type: webhookPayload.email_data?.email_action_type,
-          redirect_to: webhookPayload.email_data?.redirect_to,
-        };
-      } catch (error: any) {
-        console.error("[send-signup-confirmation] Webhook verification failed:", error.message);
+      if (!authHeader || authHeader !== `Bearer ${hookSecret}`) {
+        console.error("[send-signup-confirmation] Missing or invalid Authorization bearer token");
         return new Response(
-          JSON.stringify({ error: "Webhook verification failed" }),
+          JSON.stringify({ error: "unauthorized" }),
           { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
     } else {
-      // No secret configured - accept without verification (development mode)
-      console.warn("[send-signup-confirmation] SEND_EMAIL_HOOK_SECRET not configured, skipping webhook verification");
-      body = await req.json();
+      console.warn("[send-signup-confirmation] SEND_EMAIL_HOOK_SECRET not configured; accepting request (development mode)");
+    }
+
+    // Parse JSON body and normalize fields from Supabase hook shape
+    try {
+      const raw: any = await req.json();
+      const ed = raw?.email_data || raw?.email || null;
+      body = {
+        email: raw?.user?.email || raw?.email?.recipient || raw?.email || "",
+        token_hash: ed?.token_hash ?? raw?.token_hash,
+        token: ed?.token ?? raw?.token,
+        email_action_type: ed?.email_action_type ?? raw?.email_action_type,
+        redirect_to: ed?.redirect_to ?? raw?.redirect_to,
+        confirmationUrl: raw?.confirmationUrl,
+        subject: raw?.subject,
+        text: raw?.text,
+        html: raw?.html,
+      };
+    } catch (e: any) {
+      console.error("[send-signup-confirmation] Failed to parse JSON body:", e?.message || e);
+      return new Response(
+        JSON.stringify({ error: "invalid_json" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     // Log full payload in development to help debugging (best-effort)
