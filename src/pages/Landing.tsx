@@ -130,12 +130,6 @@ const Landing = () => {
                   </Button>
                 </>
               )}
-              <img
-                alt="Jenga Biz Africa"
-                loading="lazy"
-                src="https://e7fdf1423f81446a993eb4bf0c13ff07-76d81d5979ce491580f1c8704.fly.dev/jenga-biz-logo.png"
-                className="landing-logo w-[70px] h-[70px] sm:w-auto sm:h-10 mr-1 sm:mr-0 block"
-              />
             </div>
           </div>
         </div>
