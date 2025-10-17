@@ -7,21 +7,19 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * Redirects to APP_URL after successful confirmation
  */
 const handler = async (req: Request): Promise<Response> => {
-  const appUrl = Deno.env.get("APP_URL") || "https://jengabiz.africa";
-  
   try {
     const url = new URL(req.url);
     const tokenHash = url.searchParams.get("token_hash");
     const type = url.searchParams.get("type") || "signup";
     const redirectTo = url.searchParams.get("redirect_to");
     
+    const appUrl = Deno.env.get("APP_URL") || "https://jengabiz.africa";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     if (!tokenHash) {
-      // Redirect to app with error parameter instead of blocking
-      const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}/dashboard`;
-      return Response.redirect(`${finalRedirect}?confirmation_error=missing_token`, 302);
+      // Redirect to error page
+      return Response.redirect(`${appUrl}/auth?error=missing_token`, 302);
     }
 
     // Create client for verification
@@ -35,11 +33,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (error || !data.session) {
       console.error("Email confirmation error:", error);
-      
-      // Redirect to app with error parameter - never block access
-      const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}/dashboard`;
-      const errorCode = error?.message?.includes("expired") ? "expired" : "failed";
-      return Response.redirect(`${finalRedirect}?confirmation_error=${errorCode}&email=${encodeURIComponent(data?.user?.email || '')}`, 302);
+      const errorMsg = encodeURIComponent(error?.message || "Confirmation failed");
+      return Response.redirect(`${appUrl}/auth?error=${errorMsg}`, 302);
     }
 
     // Update profile email_confirmed status
@@ -60,22 +55,22 @@ const handler = async (req: Request): Promise<Response> => {
     const accessTokenCookie = `sb-access-token=${data.session.access_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${data.session.expires_in}${isProduction ? "; Secure" : ""}; Domain=${cookieDomain}`;
     const refreshTokenCookie = `sb-refresh-token=${data.session.refresh_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${isProduction ? "; Secure" : ""}; Domain=${cookieDomain}`;
 
-    // Redirect to app with session established and success parameter
+    // Redirect to app with session established
     const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}/dashboard`;
     
     return new Response(null, {
       status: 302,
       headers: {
-        "Location": `${finalRedirect}?confirmation_success=true`,
+        "Location": finalRedirect,
         "Set-Cookie": [accessTokenCookie, refreshTokenCookie].join(", "),
       },
     });
 
   } catch (error: any) {
     console.error("Error in confirm-email function:", error);
-    // Always redirect to app, never show error page
-    const finalRedirect = `${appUrl}/dashboard`;
-    return Response.redirect(`${finalRedirect}?confirmation_error=unexpected`, 302);
+    const appUrl = Deno.env.get("APP_URL") || "https://jengabiz.africa";
+    const errorMsg = encodeURIComponent("Unexpected error occurred");
+    return Response.redirect(`${appUrl}/auth?error=${errorMsg}`, 302);
   }
 };
 
