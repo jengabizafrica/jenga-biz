@@ -68,13 +68,13 @@ const Landing = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-b from-white to-orange-50 max-w-full">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10 landing-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 landing-wrapper">
           <div className="flex justify-between items-center py-4">
-            <img src="/jenga-biz-logo.png" alt="Jenga Biz Africa" className="h-10 w-auto" />
-            <div className="flex items-center gap-2">
+            <div className="flex-0" />
+            <div className="flex items-center gap-2 overflow-auto sm:overflow-visible whitespace-nowrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -124,6 +124,7 @@ const Landing = () => {
                   </Button>
                 </>
               )}
+              <img src="/jenga-biz-logo.png" alt="Jenga Biz Africa" loading="lazy" className="w-[70px] h-[70px] sm:w-auto sm:h-10 mr-1 sm:mr-0" />
             </div>
           </div>
         </div>
