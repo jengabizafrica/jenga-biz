@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,10 @@ import { startImpersonation } from '@/lib/tenant';
 
 interface UserWithRoles extends User {
   roles: string[];
+  subscription?: {
+    plan_name: string;
+    status: string;
+  } | null;
 }
 
 export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAdmins?: boolean; hubId?: string | null }) {
@@ -31,6 +35,7 @@ export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAd
     country: string; 
     organization_name: string; 
   }>({ full_name: "", email: "", account_type: "", country: "", organization_name: "" });
+  const [usersWithSubscriptions, setUsersWithSubscriptions] = useState<UserWithRoles[]>([]);
   
   const { toast } = useToast();
   
@@ -54,6 +59,52 @@ export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAd
   
   const { getRoleColor } = useRoleManagement();
   const deleteUserHardMut = useDeleteUserHard();
+
+  // Fetch subscription data for all users
+  useEffect(() => {
+    const fetchSubscriptions = async () => {
+      if (!users.length) {
+        setUsersWithSubscriptions([]);
+        return;
+      }
+
+      try {
+        const { data: subscriptions, error } = await supabase
+          .from('user_subscriptions')
+          .select(`
+            user_id,
+            status,
+            plan:subscription_plans(name)
+          `)
+          .in('user_id', users.map(u => u.id))
+          .eq('status', 'active');
+
+        if (error) throw error;
+
+        const subscriptionMap = new Map(
+          subscriptions?.map(sub => [
+            sub.user_id,
+            {
+              plan_name: (sub.plan as any)?.name || 'Free',
+              status: sub.status
+            }
+          ]) || []
+        );
+
+        const enrichedUsers = users.map(user => ({
+          ...user,
+          subscription: subscriptionMap.get(user.id) || { plan_name: 'Free', status: 'inactive' }
+        }));
+
+        setUsersWithSubscriptions(enrichedUsers);
+      } catch (error) {
+        console.error('Error fetching subscriptions:', error);
+        setUsersWithSubscriptions(users.map(u => ({ ...u, subscription: { plan_name: 'Free', status: 'inactive' } })));
+      }
+    };
+
+    fetchSubscriptions();
+  }, [users]);
 
   const handleUpdateUserRole = async (userId: string, newRole: 'entrepreneur' | 'hub_manager' | 'admin' | 'super_admin', action: 'add' | 'remove') => {
     // Find user locally to avoid redundant calls
@@ -122,7 +173,7 @@ export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAd
   };
 
   // Since filtering is now handled by the hook, we just use the users directly
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = usersWithSubscriptions.filter(user => {
     // Additional client-side filtering if needed
     if (searchQuery) {
       const matchesSearch = user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -247,6 +298,7 @@ export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAd
                 <TableRow>
                   <TableHead>User</TableHead>
                   <TableHead>Account Type</TableHead>
+                  <TableHead>Subscription</TableHead>
                   <TableHead>Roles</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
@@ -263,6 +315,11 @@ export function UserManagement({ hideSuperAdmins = false, hubId }: { hideSuperAd
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{user.account_type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.subscription?.status === 'active' ? 'default' : 'secondary'}>
+                        {user.subscription?.plan_name || 'Free'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
