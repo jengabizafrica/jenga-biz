@@ -43,6 +43,17 @@ const handler = async (req: Request): Promise<Response> => {
     console.debug("send-signup-confirmation: hookSecret present=", !!hookSecret);
     console.debug("send-signup-confirmation: hookSecret =", hookSecret);
     const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+    // Debug: log header names (keys) and whether an Authorization header is present.
+    // IMPORTANT: do NOT log header values to avoid leaking secrets.
+    try {
+      console.debug(
+        "send-signup-confirmation: incoming header keys=",
+        Array.from(req.headers.keys()),
+        "auth present=",authHeader,
+      );
+    } catch (e) {
+      // ignore any logging errors
+    }
 
     if (hookSecret) {
       if (!authHeader) {
