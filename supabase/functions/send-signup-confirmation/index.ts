@@ -263,11 +263,15 @@ const handler = async (req: Request): Promise<Response> => {
     const email = body.email;
     const tokenHash = body.token_hash;
     const token = body.token;
-    const siteUrl = Deno.env.get("SITE_CONFIRMATION_URL") || "https://jengabiz.africa";
+    
+    // Normalize base URL to origin to avoid path prefixes causing 404s
+    const rawSite = Deno.env.get("SITE_CONFIRMATION_URL") || Deno.env.get("APP_URL") || "https://jengabiz.africa";
+    const siteOrigin = new URL(rawSite).origin;
     
     // Build server-side confirmation URL pointing to edge function
     const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-email`;
-    const redirectTo = body.redirect_to || `${siteUrl}/dashboard`;
+    // Always redirect to /confirm-email page (ignore body.redirect_to to prevent 404s)
+    const redirectTo = `${siteOrigin}/confirm-email`;
     
     let confirmationUrl: string;
     if (tokenHash) {

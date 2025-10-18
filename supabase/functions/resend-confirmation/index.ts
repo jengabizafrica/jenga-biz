@@ -103,11 +103,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate confirmation link for existing unconfirmed user
     // Use magiclink type which works for both new and existing users
+    // Normalize URL to origin to avoid path prefixes causing 404s
+    const appRaw = Deno.env.get('APP_URL') || 'https://jengabiz.africa';
+    const appOrigin = new URL(appRaw).origin;
+    
     const { data, error } = await serviceClient.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
       options: {
-        redirectTo: `${Deno.env.get('APP_URL') || 'https://jengabiz.africa'}/confirm-email`
+        redirectTo: `${appOrigin}/confirm-email`
       }
     });
 
@@ -147,10 +151,11 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Build server-side confirmation URL pointing to confirm-email edge function
-    const siteUrl = Deno.env.get("SITE_CONFIRMATION_URL") || Deno.env.get("APP_URL") || "https://jengabiz.africa";
+    // Build server-side confirmation URL pointing to confirm-email edge function - normalize URL to origin
+    const rawSite = Deno.env.get("SITE_CONFIRMATION_URL") || Deno.env.get("APP_URL") || "https://jengabiz.africa";
+    const siteOrigin = new URL(rawSite).origin;
     const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-email`;
-    const redirectTo = `${siteUrl}/confirm-email`;
+    const redirectTo = `${siteOrigin}/confirm-email`;
 
     // Construct the confirmation URL (matches send-signup-confirmation pattern)
     const confirmationUrl = `${functionUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=signup&redirect_to=${encodeURIComponent(redirectTo)}`;

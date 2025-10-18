@@ -7,7 +7,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * Redirects to APP_URL after successful confirmation
  */
 const handler = async (req: Request): Promise<Response> => {
-  const appUrl = Deno.env.get("APP_URL") || "https://jengabiz.africa";
+  // Normalize base URL to origin to avoid path prefixes causing 404s
+  const appRaw = Deno.env.get("APP_URL") || "https://jengabiz.africa";
+  const appOrigin = new URL(appRaw).origin;
   
   try {
     const url = new URL(req.url);
@@ -19,9 +21,8 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     if (!tokenHash) {
-      // Redirect to app with error parameter instead of blocking
-      const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}/dashboard`;
-      return Response.redirect(`${finalRedirect}?confirmation_error=missing_token`, 302);
+      // Redirect to /confirm-email with error parameter
+      return Response.redirect(`${appOrigin}/confirm-email?confirmation_error=missing_token`, 302);
     }
 
     // Create client for verification
@@ -36,10 +37,9 @@ const handler = async (req: Request): Promise<Response> => {
     if (error || !data.session) {
       console.error("Email confirmation error:", error);
       
-      // Redirect to app with error parameter - never block access
-      const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}/dashboard`;
+      // Redirect to /confirm-email with error parameter
       const errorCode = error?.message?.includes("expired") ? "expired" : "failed";
-      return Response.redirect(`${finalRedirect}?confirmation_error=${errorCode}&email=${encodeURIComponent(data?.user?.email || '')}`, 302);
+      return Response.redirect(`${appOrigin}/confirm-email?confirmation_error=${errorCode}&email=${encodeURIComponent(data?.user?.email || '')}`, 302);
     }
 
     // Update profile email_confirmed status
@@ -53,22 +53,19 @@ const handler = async (req: Request): Promise<Response> => {
         .eq("id", data.user.id);
     }
 
-    // Redirect to app with session tokens in URL hash (secure)
-    const finalRedirect = redirectTo ? decodeURIComponent(redirectTo) : `${appUrl}`;
-    
-    console.log("Redirecting to:", `${finalRedirect}?confirmation_success=true`);
+    // Redirect to /confirm-email with session tokens in URL hash (secure)
+    console.log("Redirecting to:", `${appOrigin}/confirm-email?confirmation_success=true`);
     
     // Pass tokens in URL hash (not query params) for security
     // Client will read these and call setSession()
-    const redirectUrl = `${finalRedirect}?confirmation_success=true#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}&expires_in=${data.session.expires_in}&token_type=bearer`;
+    const redirectUrl = `${appOrigin}/confirm-email?confirmation_success=true#access_token=${encodeURIComponent(data.session.access_token)}&refresh_token=${encodeURIComponent(data.session.refresh_token)}&expires_in=${data.session.expires_in}&token_type=bearer`;
     
     return Response.redirect(redirectUrl, 302);
 
   } catch (error: any) {
     console.error("Error in confirm-email function:", error);
-    // Always redirect to app, never show error page
-    const finalRedirect = `${appUrl}/dashboard`;
-    return Response.redirect(`${finalRedirect}?confirmation_error=unexpected`, 302);
+    // Always redirect to /confirm-email with error
+    return Response.redirect(`${appOrigin}/confirm-email?confirmation_error=unexpected`, 302);
   }
 };
 
