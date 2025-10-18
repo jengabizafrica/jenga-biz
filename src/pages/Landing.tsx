@@ -194,7 +194,7 @@ const Landing = () => {
     <div className="min-h-screen bg-gradient-to-b from-white to-orange-50 max-w-full">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10 landing-header">
-        <div className="max-w-full sm:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 landing-wrapper">
+        <div className="w-full px-4 sm:px-6 lg:px-8 landing-wrapper">
           <div className="flex justify-between items-center py-4 max-w-full">
             <img
               alt="Jenga Biz Africa"
