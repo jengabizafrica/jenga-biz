@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { PendingApprovalsList } from '../admin/PendingApprovalsList';
 import { SubscriptionPlansManager } from '../admin/SubscriptionPlansManager';
+import { PaystackTesting } from '../admin/PaystackTesting';
 import TemplatesManager from './TemplatesManager';
 
 
@@ -413,6 +414,12 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
               </TabsTrigger>
             )}
             {isSuperAdmin && (
+              <TabsTrigger value="paystack" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                <span>Paystack Testing</span>
+              </TabsTrigger>
+            )}
+            {isSuperAdmin && (
               <TabsTrigger value="analytics" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
                 <span>Analytics</span>
@@ -578,6 +585,12 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
           {isSuperAdmin && (
             <TabsContent value="subscriptions" className="space-y-6">
               <SubscriptionPlansManager />
+            </TabsContent>
+          )}
+
+          {isSuperAdmin && (
+            <TabsContent value="paystack" className="space-y-6">
+              <PaystackTesting />
             </TabsContent>
           )}
 

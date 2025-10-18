@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/lib/api-client';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +44,7 @@ export default function Pricing() {
   const [showEnhancedAuth, setShowEnhancedAuth] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
   const [selectedCycles, setSelectedCycles] = useState<Record<string, string>>({});
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const { toast } = useToast();
   const { selectedCurrency, changeCurrency, currentCurrency } = useCurrencies();
 
@@ -81,7 +83,25 @@ export default function Pricing() {
 
   useEffect(() => {
     fetchPlans();
-  }, []);
+    if (user) {
+      checkSuperAdminStatus();
+    }
+  }, [user]);
+
+  const checkSuperAdminStatus = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'super_admin')
+        .maybeSingle();
+      setIsSuperAdmin(!!data);
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+    }
+  };
 
   const handleRetry = () => {
     fetchPlans();
@@ -369,15 +389,25 @@ export default function Pricing() {
                       <Button variant="outline" className="w-full" disabled>
                         Current Plan
                       </Button>
+                    ) : isAuthenticated ? (
+                      isSuperAdmin ? (
+                        <Button className="w-full" onClick={() => handleSubscribe(plan.id)} disabled={busyPlan === plan.id}>
+                          {busyPlan === plan.id ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting...
+                            </>
+                          ) : (
+                            <>Test Payment</>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button variant="outline" className="w-full" disabled>
+                          Contact Admin to Subscribe
+                        </Button>
+                      )
                     ) : (
-                      <Button className="w-full" onClick={() => handleSubscribe(plan.id)} disabled={busyPlan === plan.id}>
-                        {busyPlan === plan.id ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecting...
-                          </>
-                        ) : (
-                          <>Subscribe Now</>
-                        )}
+                      <Button className="w-full" onClick={() => setShowAuthDialog(true)}>
+                        Get Started
                       </Button>
                     )}
                   </div>
