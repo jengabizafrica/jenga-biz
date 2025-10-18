@@ -58,36 +58,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Rate limiting check: max 3 resends per hour
-    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    
-    console.log("Checking rate limit for user:", user.id, "since:", oneHourAgo);
-    
-    const { data: recentActivity, error: activityError } = await serviceClient
-      .from("user_activities")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("activity_type", "resend_confirmation")
-      .gte("created_at", oneHourAgo);
-
-    if (activityError) {
-      console.error("Error checking resend rate limit:", activityError);
-    } else if (recentActivity && recentActivity.length >= 3) {
-      console.log("❌ Rate limit hit:", recentActivity.length, "recent attempts found (limit: 3)");
-      return new Response(
-        JSON.stringify({ 
-          error: "Rate limit exceeded. Maximum 3 resend requests per hour.",
-          retry_after: 3600,
-          attempts: recentActivity.length
-        }),
-        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    console.log("✓ Rate limit OK:", recentActivity?.length || 0, "recent attempts");
-
     // Check if email is already confirmed before generating new token
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
     const { data: profileData } = await serviceClient
       .from('profiles')
       .select('email_confirmed')
