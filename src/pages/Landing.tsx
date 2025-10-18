@@ -195,7 +195,7 @@ const Landing = () => {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-10 landing-header">
         <div className="w-full max-w-none px-4 sm:px-6 lg:px-8 landing-wrapper">
-          <div className="flex justify-between items-center py-4 max-w-full">
+          <div className="flex justify-between items-center py-4 w-full">
             <img
               alt="Jenga Biz Africa"
               loading="lazy"
