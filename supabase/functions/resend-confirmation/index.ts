@@ -17,6 +17,8 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log("=== Resend confirmation request started ===");
+    
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -37,11 +39,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
+      console.log("Unauthorized: no valid user");
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
+
+    console.log("User authenticated:", user.id, user.email);
 
     const body: ResendRequest = await req.json().catch(() => ({}));
     const email = body.email || user.email;
@@ -57,6 +62,8 @@ const handler = async (req: Request): Promise<Response> => {
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     
+    console.log("Checking rate limit for user:", user.id, "since:", oneHourAgo);
+    
     const { data: recentActivity, error: activityError } = await serviceClient
       .from("user_activities")
       .select("id")
@@ -67,14 +74,18 @@ const handler = async (req: Request): Promise<Response> => {
     if (activityError) {
       console.error("Error checking resend rate limit:", activityError);
     } else if (recentActivity && recentActivity.length >= 3) {
+      console.log("❌ Rate limit hit:", recentActivity.length, "recent attempts found (limit: 3)");
       return new Response(
         JSON.stringify({ 
           error: "Rate limit exceeded. Maximum 3 resend requests per hour.",
-          retry_after: 3600 
+          retry_after: 3600,
+          attempts: recentActivity.length
         }),
         { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
+    
+    console.log("✓ Rate limit OK:", recentActivity?.length || 0, "recent attempts");
 
     // Check if email is already confirmed before generating new token
     const { data: profileData } = await serviceClient
@@ -83,7 +94,10 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('id', user.id)
       .single();
 
+    console.log("Email confirmation status:", profileData?.email_confirmed);
+
     if (profileData?.email_confirmed) {
+      console.log("Email already confirmed, rejecting resend");
       return new Response(
         JSON.stringify({ 
           error: "Your email is already confirmed. Please try logging in." 
@@ -93,6 +107,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Log the resend activity
+    console.log("Logging resend activity for user:", user.id);
     await serviceClient
       .from("user_activities")
       .insert({
@@ -260,6 +275,7 @@ The Jenga Biz Africa Team
       };
 
       console.log("Sending confirmation email via Brevo to:", email);
+      console.log("Brevo API key present:", !!brevoKey);
 
       const brevoResp = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
