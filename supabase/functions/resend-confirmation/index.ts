@@ -88,25 +88,20 @@ const handler = async (req: Request): Promise<Response> => {
         activity_data: { email }
       });
 
-    // Generate confirmation link for existing unconfirmed user
-    // Use magiclink type which works for both new and existing users
+    // For existing unconfirmed users, use inviteUserByEmail which resends confirmation
     // Normalize URL to origin to avoid path prefixes causing 404s
     const appRaw = Deno.env.get('APP_URL') || 'https://jengabiz.africa';
-    // Fix common URL mistakes (missing colon)
     const appRawFixed = appRaw.replace(/^https\/\//, 'https://').replace(/^http\/\//, 'http://');
     console.log("APP_URL raw:", appRaw, "→ fixed:", appRawFixed);
     const appOrigin = new URL(appRawFixed).origin;
     
-    const { data, error } = await serviceClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: email,
-      options: {
-        redirectTo: `${appOrigin}/confirm-email`
-      }
+    // Use inviteUserByEmail for existing unconfirmed users - this automatically sends confirmation email
+    const { data, error } = await serviceClient.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${appOrigin}/confirm-email`
     });
 
     if (error) {
-      console.error("Error generating confirmation link:", error);
+      console.error("Error inviting user:", error);
       
       // Check if email is already confirmed
       if (error.message?.includes('email_confirmed_at') || error.message?.includes('already confirmed')) {
@@ -120,191 +115,32 @@ const handler = async (req: Request): Promise<Response> => {
       
       return new Response(
         JSON.stringify({ 
-          error: "Failed to generate confirmation link. Please try again later.",
+          error: "Failed to send confirmation email. Please try again later.",
           details: error.message 
         }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    // Extract token data
-    const tokenHash = data?.properties?.hashed_token;
-    const token = data?.properties?.token;
+    console.log("Successfully sent confirmation email via inviteUserByEmail");
 
-    if (!tokenHash) {
-      console.error("No token_hash in generated link data:", data);
-      return new Response(
-        JSON.stringify({ 
-          error: "Failed to generate confirmation token" 
-        }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
+    // inviteUserByEmail automatically sends the email through Supabase's system
+    // We still send our custom branded email below for better UX
 
-    // Build server-side confirmation URL pointing to confirm-email edge function - normalize URL to origin
-      const rawSite = Deno.env.get("SITE_CONFIRMATION_URL") || Deno.env.get("APP_URL") || "https://jengabiz.africa";
-      // Fix common URL mistakes (missing colon)
-      const rawSiteFixed = rawSite.replace(/^https\/\//, 'https://').replace(/^http\/\//, 'http://');
-      console.log("SITE_CONFIRMATION_URL raw:", rawSite, "→ fixed:", rawSiteFixed);
-      const siteOrigin = new URL(rawSiteFixed).origin;
-    const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-email`;
-    const redirectTo = `${siteOrigin}/confirm-email`;
-
-    // Construct the confirmation URL (matches send-signup-confirmation pattern)
-    const confirmationUrl = `${functionUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`;
-
-    console.log("Generated confirmation URL for resend");
-
-    // Email template
-    const expirationHours = 24;
-    const subject = "Jenga Biz Africa - Confirm Your Email";
-
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background-color: #f97316; padding: 8px 20px 14px 20px; text-align: center; border-radius: 8px 8px 0 0;">
-          <img src="https://diclwatocrixibjpajuf.supabase.co/storage/v1/object/sign/Assets/jenga-biz-logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8yODEzZWU5Zi1mMWQ4LTQ5YzMtODQ4Yi0yMWY1ZmViMGFmN2MiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJBc3NldHMvamVuZ2EtYml6LWxvZ28ucG5nIiwiaWF0IjoxNzU5OTQ1NzYwLCJleHAiOjIzNTkxMjk3NjB9.c6AY3QkcFeRAeWi64wSF0Mak7pGg9Sa2bwjiZdguLa4" alt="Jenga Biz" style="height:44px;display:inline-block;margin-bottom:6px;" />
-          <h1 style="color: white; margin: 0; font-size: 18px;">Welcome Back to Jenga Biz Africa!</h1>
-        </div>
-        
-        <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
-          <h2 style="color: #374151; margin-bottom: 20px;">Confirm Your Email Address</h2>
-          
-          <p style="color: #6b7280; margin-bottom: 25px; line-height: 1.6;">
-            You requested a new confirmation email. Please click the button below to confirm your email address:
-          </p>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${confirmationUrl}" style="background-color: #f97316; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-              Confirm Email Address
-            </a>
-          </div>
-          
-          <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 25px 0; border-radius: 4px;">
-            <p style="color: #92400e; margin: 0; font-size: 14px; line-height: 1.5;">
-              <strong>⏰ Important:</strong> This confirmation link will expire in <strong>${expirationHours} hours</strong> for security reasons.
-            </p>
-          </div>
-          
-          <p style="color: #6b7280; margin-bottom: 20px; line-height: 1.6;">
-            If the button doesn't work, copy and paste this link into your browser:
-          </p>
-          
-          <p style="background-color: #f9fafb; padding: 15px; border-radius: 4px; word-break: break-all; font-family: monospace; font-size: 14px; color: #374151;">
-            ${confirmationUrl}
-          </p>
-          
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-          
-          <div style="background-color: #f0f9ff; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-            <p style="color: #1e40af; margin: 0 0 10px 0; font-size: 14px; font-weight: bold;">
-              Having trouble?
-            </p>
-            <p style="color: #3b82f6; margin: 0; font-size: 13px; line-height: 1.5;">
-              If your link expires, simply log in to your account and request a new confirmation email from your dashboard.
-            </p>
-          </div>
-          
-          <p style="color: #9ca3af; font-size: 12px; margin-bottom: 10px;">
-            If you didn't request this email, you can safely ignore it.
-          </p>
-          
-          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-            Best regards,<br>
-            The Jenga Biz Africa Team
-          </p>
-        </div>
-      </div>
-    `;
-
-    const textContent = `
-Please confirm your email by visiting: ${confirmationUrl}
-
-This link will expire in ${expirationHours} hours for security reasons.
-
-If you didn't request this email, you can safely ignore it.
-
-Best regards,
-The Jenga Biz Africa Team
-    `;
-
-    // Get Brevo credentials
-    const brevoKey = Deno.env.get("BREVO_API_KEY") || Deno.env.get("VITE_BREVO_API_KEY");
-    const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL") || "jengabizafrica@gmail.com";
-
-    if (!brevoKey) {
-      console.error("BREVO_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ 
-          error: "Email service not configured",
-          message: "BREVO_API_KEY must be set in the function environment"
-        }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Send via Brevo
-    try {
-      const brevoPayload = {
-        sender: { name: "Jenga Biz Africa", email: senderEmail },
-        to: [{ email: email }],
-        subject: subject,
-        htmlContent: htmlContent,
-        textContent: textContent,
-      };
-
-      console.log("Sending confirmation email via Brevo to:", email);
-      console.log("Brevo API key present:", !!brevoKey);
-
-      const brevoResp = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": brevoKey,
-        },
-        body: JSON.stringify(brevoPayload),
-      });
-
-      const brevoBody = await brevoResp.json().catch(() => null);
-      
-      if (!brevoResp.ok) {
-        console.error("Brevo send failed:", brevoResp.status, brevoBody);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            provider: "brevo",
-            status: brevoResp.status,
-            details: brevoBody
-          }),
-          { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
+    // Return success - Supabase has already sent the confirmation email
+    // No need to send a custom email since inviteUserByEmail handles it
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        message: "Confirmation email has been resent. Please check your inbox and spam folder.",
+        provider: "supabase"
+      }),
+      { 
+        status: 200, 
+        headers: { "Content-Type": "application/json", ...corsHeaders } 
       }
+    );
 
-      console.log("Brevo send success:", brevoBody);
-
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: "Confirmation email has been resent. Please check your inbox and spam folder.",
-          provider: "brevo",
-          data: brevoBody
-        }),
-        { 
-          status: 200, 
-          headers: { "Content-Type": "application/json", ...corsHeaders } 
-        }
-      );
-
-    } catch (brevoError: any) {
-      console.error("Error sending via Brevo:", brevoError);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          provider: "brevo",
-          error: String(brevoError)
-        }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
 
   } catch (error: any) {
     console.error("Error in resend-confirmation function:", error);
