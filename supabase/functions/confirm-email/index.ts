@@ -31,11 +31,29 @@ const handler = async (req: Request): Promise<Response> => {
     // Create client for verification
     const client = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify OTP using token_hash (server-side with service role)
-    const { data, error } = await client.auth.verifyOtp({
+    // Try verifying with provided type first
+    console.log(`Attempting verification with type: ${type}`);
+    let verifyResult = await client.auth.verifyOtp({
       token_hash: tokenHash,
       type: type as any,
     });
+
+    // If expired/invalid and type mismatch suspected, try alternate type
+    if (verifyResult.error && verifyResult.error.message?.includes('expired')) {
+      const alternateType = type === 'signup' ? 'magiclink' : 'signup';
+      console.log(`Primary type '${type}' failed, retrying with '${alternateType}'`);
+      
+      verifyResult = await client.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: alternateType as any,
+      });
+      
+      if (!verifyResult.error) {
+        console.log(`✓ Verification succeeded with alternate type: ${alternateType}`);
+      }
+    }
+
+    const { data, error } = verifyResult;
 
     if (error || !data.session) {
       console.error("Email confirmation error:", error);

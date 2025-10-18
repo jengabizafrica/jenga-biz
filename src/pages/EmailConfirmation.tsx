@@ -17,22 +17,63 @@ export default function EmailConfirmation() {
   const email = searchParams.get('email');
 
   useEffect(() => {
-    if (confirmationSuccess) {
-      toast.success('Email Confirmed!', {
-        description: 'Your email has been successfully verified.',
-        duration: 5000,
-      });
-      // Delay navigation to allow user to see the toast
-      setTimeout(() => {
+    const handleConfirmation = async () => {
+      // Parse session tokens from URL hash
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+
+      if (confirmationSuccess && accessToken && refreshToken) {
+        try {
+          // Set the session using tokens from hash
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            console.error('Error setting session:', sessionError);
+            toast.error('Session Error', {
+              description: 'Could not establish session. Please log in manually.',
+            });
+            setTimeout(() => navigate('/', { replace: true }), 2000);
+            return;
+          }
+
+          toast.success('Email Confirmed!', {
+            description: 'Your email has been verified and you are now logged in.',
+            duration: 5000,
+          });
+
+          // Navigate to dashboard after successful session setup
+          setTimeout(() => {
+            navigate('/dashboard', { replace: true });
+          }, 2000);
+        } catch (err) {
+          console.error('Unexpected error during confirmation:', err);
+          toast.error('Unexpected Error', {
+            description: 'Please try logging in manually.',
+          });
+          setTimeout(() => navigate('/', { replace: true }), 2000);
+        }
+      } else if (confirmationSuccess) {
+        // Success but no tokens in hash (shouldn't happen)
+        toast.success('Email Confirmed!', {
+          description: 'Your email has been verified.',
+          duration: 5000,
+        });
+        setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+      } else if (confirmationError) {
+        handleConfirmationError(confirmationError, email);
+      } else {
+        // No confirmation status - redirect to dashboard
         navigate('/dashboard', { replace: true });
-      }, 2000);
-    } else if (confirmationError) {
-      handleConfirmationError(confirmationError, email);
-    } else {
-      // No confirmation status - redirect to dashboard
-      navigate('/dashboard', { replace: true });
-    }
-  }, [confirmationError, confirmationSuccess, email]);
+      }
+    };
+
+    handleConfirmation();
+  }, [confirmationError, confirmationSuccess, email, navigate]);
 
   const handleConfirmationError = (errorCode: string, userEmail: string | null) => {
     let title = 'Confirmation Failed';

@@ -98,7 +98,7 @@ const handler = async (req: Request): Promise<Response> => {
     const appOrigin = new URL(appRawFixed).origin;
     
     const { data, error } = await serviceClient.auth.admin.generateLink({
-      type: 'magiclink',
+      type: 'signup',
       email: email,
       options: {
         redirectTo: `${appOrigin}/confirm-email`
