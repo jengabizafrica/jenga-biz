@@ -88,20 +88,33 @@ const handler = async (req: Request): Promise<Response> => {
         activity_data: { email }
       });
 
-    // For existing unconfirmed users, use inviteUserByEmail which resends confirmation
     // Normalize URL to origin to avoid path prefixes causing 404s
     const appRaw = Deno.env.get('APP_URL') || 'https://jengabiz.africa';
     const appRawFixed = appRaw.replace(/^https\/\//, 'https://').replace(/^http\/\//, 'http://');
     console.log("APP_URL raw:", appRaw, "→ fixed:", appRawFixed);
     const appOrigin = new URL(appRawFixed).origin;
     
-    // Use inviteUserByEmail for existing unconfirmed users - this automatically sends confirmation email
-    const { data, error } = await serviceClient.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${appOrigin}/confirm-email`
+    // Use signInWithOtp for existing users - sends magic link without trying to create account
+    const { data, error } = await serviceClient.auth.signInWithOtp({
+      email: email,
+      options: {
+        shouldCreateUser: false,  // Don't create new users, only send to existing ones
+        emailRedirectTo: `${appOrigin}/confirm-email`
+      }
     });
 
     if (error) {
-      console.error("Error inviting user:", error);
+      console.error("Error sending magic link:", error);
+      
+      // Handle rate limiting
+      if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Too many requests. Please wait a few minutes before trying again." 
+          }),
+          { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
       
       // Check if email is already confirmed
       if (error.message?.includes('email_confirmed_at') || error.message?.includes('already confirmed')) {
@@ -122,13 +135,11 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log("Successfully sent confirmation email via inviteUserByEmail");
+    console.log("Successfully sent magic link via signInWithOtp");
 
-    // inviteUserByEmail automatically sends the email through Supabase's system
-    // We still send our custom branded email below for better UX
+    // signInWithOtp automatically sends the magic link through Supabase's system
 
-    // Return success - Supabase has already sent the confirmation email
-    // No need to send a custom email since inviteUserByEmail handles it
+    // Return success - Supabase has already sent the magic link
     return new Response(
       JSON.stringify({ 
         success: true,
