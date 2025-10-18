@@ -266,7 +266,10 @@ const handler = async (req: Request): Promise<Response> => {
     
     // Normalize base URL to origin to avoid path prefixes causing 404s
     const rawSite = Deno.env.get("SITE_CONFIRMATION_URL") || Deno.env.get("APP_URL") || "https://jengabiz.africa";
-    const siteOrigin = new URL(rawSite).origin;
+    // Fix common URL mistakes (missing colon)
+    const rawSiteFixed = rawSite.replace(/^https\/\//, 'https://').replace(/^http\/\//, 'http://');
+    console.log("SITE_CONFIRMATION_URL raw:", rawSite, "→ fixed:", rawSiteFixed);
+    const siteOrigin = new URL(rawSiteFixed).origin;
     
     // Build server-side confirmation URL pointing to edge function
     const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-email`;

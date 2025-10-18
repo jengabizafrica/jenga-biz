@@ -9,7 +9,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const handler = async (req: Request): Promise<Response> => {
   // Normalize base URL to origin to avoid path prefixes causing 404s
   const appRaw = Deno.env.get("APP_URL") || "https://jengabiz.africa";
-  const appOrigin = new URL(appRaw).origin;
+  // Fix common URL mistakes (missing colon)
+  const appRawFixed = appRaw.replace(/^https\/\//, 'https://').replace(/^http\/\//, 'http://');
+  console.log("APP_URL raw:", appRaw, "→ fixed:", appRawFixed);
+  const appOrigin = new URL(appRawFixed).origin;
   
   try {
     const url = new URL(req.url);
