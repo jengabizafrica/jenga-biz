@@ -163,7 +163,7 @@ export default function Pricing() {
       
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold">Pricing</h1>
-        <p className="text-muted-foreground mt-2">Development pricing is set to 1 KES for paid tiers.</p>
+        <p className="text-muted-foreground mt-2">Choose the plan that's right for your business</p>
         
         <div className="mt-6 max-w-xs mx-auto">
           <CurrencySelector 
@@ -256,10 +256,10 @@ export default function Pricing() {
                             <span>{limits.businesses} {limits.businesses === 1 ? 'business' : 'businesses'}</span>
                           </li>
                         )}
-                        {limits.storage_mb && (
+                        {limits.strategies && limits.strategies !== limits.businesses && (
                           <li className="flex items-center gap-2">
                             <Check className="h-4 w-4 text-primary" />
-                            <span>{limits.storage_mb >= 1024 ? `${(limits.storage_mb / 1024).toFixed(0)} GB` : `${limits.storage_mb} MB`} storage</span>
+                            <span>{limits.strategies} {limits.strategies === 1 ? 'strategy' : 'strategies'}</span>
                           </li>
                         )}
                       </ul>
@@ -267,7 +267,53 @@ export default function Pricing() {
                   )}
 
                   {/* Features List */}
-                  {Object.keys(features).length > 0 && (
+                  {(features.business_strategy || features.milestones || features.financial_tracking || features.ai_summary || features.share_download) ? (
+                    <div className="mb-6 flex-1">
+                      <h4 className="font-semibold text-sm mb-3">Features</h4>
+                      <ul className="space-y-3 text-sm">
+                        {features.business_strategy && (
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <div>
+                              <strong>Business Strategy:</strong> {features.business_strategy}
+                            </div>
+                          </li>
+                        )}
+                        {features.milestones && (
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <div>
+                              <strong>Milestones:</strong> {features.milestones}
+                            </div>
+                          </li>
+                        )}
+                        {features.financial_tracking && (
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <div>
+                              <strong>Financial Tracking:</strong> {features.financial_tracking}
+                            </div>
+                          </li>
+                        )}
+                        {features.ai_summary && (
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <div>
+                              <strong>AI Summary:</strong> {features.ai_summary}
+                            </div>
+                          </li>
+                        )}
+                        {features.share_download && (
+                          <li className="flex items-start gap-2">
+                            <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <div>
+                              <strong>Share/Download:</strong> {features.share_download}
+                            </div>
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  ) : Object.keys(features).length > 0 && (
                     <div className="mb-6 flex-1">
                       <h4 className="font-semibold text-sm mb-3">Features</h4>
                       <ul className="space-y-2">

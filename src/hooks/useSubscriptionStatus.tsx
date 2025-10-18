@@ -76,11 +76,12 @@ export function useSubscriptionStatus() {
   const isFree = !hasActiveSubscription || subscription.plan?.name?.toLowerCase() === 'free';
 
   const canAccessFeature = useCallback((requiredTier: 'free' | 'essential' | 'pro') => {
-    // Check maintenance mode first - bypasses all gating
-    const maintenanceMode = sessionStorage.getItem('maintenance_mode') === 'true';
-    if (maintenanceMode) {
-      console.log('[Subscription] Maintenance mode active - bypassing subscription check');
-      return true;
+    // Check demo mode first - Free tier features with no expiration
+    const demoMode = sessionStorage.getItem('demo_mode') === 'true';
+    if (demoMode) {
+      console.log('[Subscription] Demo mode active - Free tier features without expiration');
+      // In demo mode, only Free tier features are accessible (limits still enforced)
+      return requiredTier === 'free';
     }
 
     const planName = subscription.plan?.name?.toLowerCase() || '';
@@ -88,13 +89,17 @@ export function useSubscriptionStatus() {
     // Free tier: base access
     if (requiredTier === 'free') return true;
     
-    // Check trial period for Free tier
+    // Normal mode: Check trial period for Free tier
     if (planName === 'free' && subscription.currentPeriodEnd) {
       const trialEnd = new Date(subscription.currentPeriodEnd);
       const isInTrial = trialEnd > new Date();
       if (isInTrial) {
-        console.log('[Subscription] Free tier in trial period - full access');
-        return true;
+        console.log('[Subscription] Free tier in 14-day trial - full access');
+        return true; // Full access during trial
+      } else {
+        console.log('[Subscription] Free tier trial expired - limited to Free features only');
+        // After trial expires, deny all access (user must upgrade or will see blocker)
+        return false;
       }
     }
     

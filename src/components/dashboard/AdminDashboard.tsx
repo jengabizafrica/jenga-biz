@@ -40,15 +40,15 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
 
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean>(false);
   const [autoApproveOrgs, setAutoApproveOrgs] = useState<boolean>(false);
-  const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false);
+  const [demoMode, setDemoMode] = useState<boolean>(false);
   const [allowedCurrencies, setAllowedCurrencies] = useState<string[]>([]);
   const [paystackWebhookUrl, setPaystackWebhookUrl] = useState<string>('');
   const [paystackCallbackUrl, setPaystackCallbackUrl] = useState<string>('');
   const { 
     getAutoApprove, 
     setAutoApprove, 
-    getMaintenanceMode, 
-    setMaintenanceMode: saveMaintenanceMode,
+    getDemoMode, 
+    setDemoMode: saveDemoMode,
     getAllowedCurrencies,
     setAllowedCurrencies: saveAllowedCurrencies,
     getPaystackWebhookUrl,
@@ -60,15 +60,15 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
   } = useAppSettings();
 
   const loadSettings = async () => {
-    const [autoApprove, maintenance, currencies, webhookUrl, callbackUrl] = await Promise.all([
+    const [autoApprove, demo, currencies, webhookUrl, callbackUrl] = await Promise.all([
       getAutoApprove(),
-      getMaintenanceMode(),
+      getDemoMode(),
       getAllowedCurrencies(),
       getPaystackWebhookUrl(),
       getPaystackCallbackUrl(),
     ]);
     setAutoApproveOrgs(autoApprove);
-    setMaintenanceMode(maintenance);
+    setDemoMode(demo);
     setAllowedCurrencies(currencies);
     setPaystackWebhookUrl(webhookUrl);
     setPaystackCallbackUrl(callbackUrl);
@@ -77,7 +77,7 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
   const saveSettings = async () => {
     const [s1, s2, s3, s4, s5] = await Promise.all([
       setAutoApprove(autoApproveOrgs),
-      saveMaintenanceMode(maintenanceMode),
+      saveDemoMode(demoMode),
       saveAllowedCurrencies(allowedCurrencies),
       savePaystackWebhookUrl(paystackWebhookUrl),
       savePaystackCallbackUrl(paystackCallbackUrl),
@@ -467,17 +467,17 @@ export function AdminDashboard({ saasMode = false }: { saasMode?: boolean }) {
                         />
                       </div>
 
-                      {/* Maintenance Mode */}
+                      {/* Demo Mode */}
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <Label className="text-base">Maintenance Mode</Label>
+                          <Label className="text-base">Demo Mode</Label>
                           <p className="text-sm text-muted-foreground">
-                            When enabled, bypasses all subscription gating for end users.
+                            When enabled, all entrepreneurs get Free tier features without expiration (bypasses 14-day trial limit).
                           </p>
                         </div>
                         <Switch
-                          checked={maintenanceMode}
-                          onCheckedChange={setMaintenanceMode}
+                          checked={demoMode}
+                          onCheckedChange={setDemoMode}
                           disabled={settingsLoading}
                         />
                       </div>

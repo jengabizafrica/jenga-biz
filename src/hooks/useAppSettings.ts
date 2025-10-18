@@ -7,8 +7,8 @@ interface UseAppSettingsReturn {
   error: string | null;
   getAutoApprove: () => Promise<boolean>;
   setAutoApprove: (value: boolean) => Promise<boolean>;
-  getMaintenanceMode: () => Promise<boolean>;
-  setMaintenanceMode: (value: boolean) => Promise<boolean>;
+  getDemoMode: () => Promise<boolean>;
+  setDemoMode: (value: boolean) => Promise<boolean>;
   getAllowedCurrencies: () => Promise<string[]>;
   setAllowedCurrencies: (currencies: string[]) => Promise<boolean>;
   getPaystackWebhookUrl: () => Promise<string>;
@@ -90,15 +90,15 @@ export function useAppSettings(): UseAppSettingsReturn {
   }, []);
 
   /**
-   * Get maintenance mode setting
+   * Get demo mode setting
    */
-  const getMaintenanceMode = useCallback(async (): Promise<boolean> => {
+  const getDemoMode = useCallback(async (): Promise<boolean> => {
     setError(null);
     try {
       const { data, error } = await supabase
         .from('app_settings')
         .select('value')
-        .eq('key', 'maintenance_mode')
+        .eq('key', 'demo_mode')
         .maybeSingle();
       
       if (error) {
@@ -114,14 +114,14 @@ export function useAppSettings(): UseAppSettingsReturn {
   }, []);
 
   /**
-   * Set maintenance mode setting
+   * Set demo mode setting
    */
-  const setMaintenanceMode = useCallback(async (value: boolean): Promise<boolean> => {
+  const setDemoMode = useCallback(async (value: boolean): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
       const { error } = await supabase.rpc('set_system_setting', {
-        p_key: 'maintenance_mode',
+        p_key: 'demo_mode',
         p_value: value ? 'true' : 'false',
         p_reason: 'Toggle from admin UI'
       });
@@ -298,8 +298,8 @@ export function useAppSettings(): UseAppSettingsReturn {
     error,
     getAutoApprove,
     setAutoApprove,
-    getMaintenanceMode,
-    setMaintenanceMode,
+    getDemoMode,
+    setDemoMode,
     getAllowedCurrencies,
     setAllowedCurrencies,
     getPaystackWebhookUrl,

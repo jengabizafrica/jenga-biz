@@ -2,45 +2,46 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Hook to check and sync maintenance mode setting from app_settings
+ * Hook to check and sync demo mode setting from app_settings
+ * Demo mode gives entrepreneurs Free tier features without expiration
  * Stores in sessionStorage for quick access by subscription gating
  */
-export function useMaintenanceMode() {
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
+export function useDemoMode() {
+  const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkMaintenanceMode = async () => {
+    const checkDemoMode = async () => {
       try {
         const { data, error } = await supabase
           .from('app_settings')
           .select('value')
-          .eq('key', 'maintenance_mode')
+          .eq('key', 'demo_mode')
           .maybeSingle();
 
         if (!error && data) {
           const isEnabled = data.value === 'true' || data.value === '1';
-          setMaintenanceMode(isEnabled);
+          setDemoMode(isEnabled);
           // Store in sessionStorage for quick access
-          sessionStorage.setItem('maintenance_mode', isEnabled ? 'true' : 'false');
+          sessionStorage.setItem('demo_mode', isEnabled ? 'true' : 'false');
         } else {
-          setMaintenanceMode(false);
-          sessionStorage.setItem('maintenance_mode', 'false');
+          setDemoMode(false);
+          sessionStorage.setItem('demo_mode', 'false');
         }
       } catch (err) {
-        console.error('Failed to check maintenance mode:', err);
-        setMaintenanceMode(false);
+        console.error('Failed to check demo mode:', err);
+        setDemoMode(false);
       } finally {
         setLoading(false);
       }
     };
 
-    checkMaintenanceMode();
+    checkDemoMode();
 
     // Poll every 30 seconds to keep in sync
-    const interval = setInterval(checkMaintenanceMode, 30000);
+    const interval = setInterval(checkDemoMode, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  return { maintenanceMode, loading };
+  return { demoMode, loading };
 }
