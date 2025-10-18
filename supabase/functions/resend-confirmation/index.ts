@@ -98,7 +98,7 @@ const handler = async (req: Request): Promise<Response> => {
     const appOrigin = new URL(appRawFixed).origin;
     
     const { data, error } = await serviceClient.auth.admin.generateLink({
-      type: 'signup',
+      type: 'magiclink',
       email: email,
       options: {
         redirectTo: `${appOrigin}/confirm-email`
@@ -151,7 +151,7 @@ const handler = async (req: Request): Promise<Response> => {
     const redirectTo = `${siteOrigin}/confirm-email`;
 
     // Construct the confirmation URL (matches send-signup-confirmation pattern)
-    const confirmationUrl = `${functionUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=signup&redirect_to=${encodeURIComponent(redirectTo)}`;
+    const confirmationUrl = `${functionUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&redirect_to=${encodeURIComponent(redirectTo)}`;
 
     console.log("Generated confirmation URL for resend");
 
