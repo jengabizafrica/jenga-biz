@@ -76,6 +76,22 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Check if email is already confirmed before generating new token
+    const { data: profileData } = await serviceClient
+      .from('profiles')
+      .select('email_confirmed')
+      .eq('id', user.id)
+      .single();
+
+    if (profileData?.email_confirmed) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Your email is already confirmed. Please try logging in." 
+        }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     // Log the resend activity
     await serviceClient
       .from("user_activities")
@@ -91,7 +107,7 @@ const handler = async (req: Request): Promise<Response> => {
       type: 'magiclink',
       email: email,
       options: {
-        redirectTo: `${Deno.env.get('APP_URL') || 'https://jengabiz.africa'}/dashboard`
+        redirectTo: `${Deno.env.get('APP_URL') || 'https://jengabiz.africa'}/confirm-email`
       }
     });
 
@@ -134,7 +150,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Build server-side confirmation URL pointing to confirm-email edge function
     const siteUrl = Deno.env.get("SITE_CONFIRMATION_URL") || Deno.env.get("APP_URL") || "https://jengabiz.africa";
     const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-email`;
-    const redirectTo = `${siteUrl}/dashboard`;
+    const redirectTo = `${siteUrl}/confirm-email`;
 
     // Construct the confirmation URL (matches send-signup-confirmation pattern)
     const confirmationUrl = `${functionUrl}?token_hash=${encodeURIComponent(tokenHash)}&type=signup&redirect_to=${encodeURIComponent(redirectTo)}`;

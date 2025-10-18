@@ -185,13 +185,19 @@ const Profile = () => {
   const handleResendConfirmation = async () => {
     setResendingEmail(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      // Check current confirmation status first
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('email_confirmed')
+        .eq('id', user?.id)
+        .single();
+
+      if (profileData?.email_confirmed) {
         toast({
-          title: "Error",
-          description: "Please log in to resend confirmation email",
-          variant: "destructive"
+          title: "Already Confirmed",
+          description: "Your email is already confirmed!",
         });
+        setEmailConfirmed(true);
         return;
       }
 
