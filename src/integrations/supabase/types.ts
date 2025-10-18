@@ -1395,35 +1395,7 @@ export type Database = {
       }
     }
     Views: {
-      financial_records_with_hub: {
-        Row: {
-          amount: number | null
-          business_id: string | null
-          created_at: string | null
-          hub_id: string | null
-          id: string | null
-          metric_type: string | null
-          notes: string | null
-          record_date: string | null
-          updated_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "businesses_hub_id_fkey"
-            columns: ["hub_id"]
-            isOneToOne: false
-            referencedRelation: "hubs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "financial_records_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: false
-            referencedRelation: "businesses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       add_user_role_with_audit: {
