@@ -5,24 +5,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Loader2, Plus, Edit, Trash2, DollarSign } from 'lucide-react';
+import { SubscriptionPlanForm } from './SubscriptionPlansForm';
 
 interface SubscriptionPlan {
   id: string;
   name: string;
   description?: string;
+  tier?: string;
+  trial_period_days?: number;
   price: number;
   currency: string;
   billing_cycle: string;
   prices: Record<string, { price: number; currency: string }>;
   available_cycles: string[];
-  features: Record<string, any>;
+  features: any;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -46,11 +48,41 @@ export function SubscriptionPlansManager() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    tier: 'free',
+    trial_period_days: 0,
     price: 0,
     currency: 'KES',
     billing_cycle: 'monthly',
-    features: {} as Record<string, any>,
     is_active: true,
+    limits: {
+      businesses: 1,
+      strategies: 1,
+      milestones: {
+        total: 20,
+        stages: ['concept', 'early_stage'],
+      },
+      financial_tracking: {
+        receipts_per_month: 0,
+        ocr_enabled: false,
+      },
+      ai_summary: {
+        type: 'none',
+        count: '0',
+      },
+      share_download: {
+        whatsapp: 'unlimited',
+        email: 'unlimited',
+        downloads_per_month: 0,
+        formats: [] as string[],
+      },
+    },
+    feature_descriptions: {
+      business_strategy: '',
+      milestones: '',
+      financial_tracking: '',
+      ai_summary: '',
+      share_download: '',
+    },
   });
 
   // New pricing state for multiple billing cycles
@@ -83,11 +115,41 @@ export function SubscriptionPlansManager() {
     setFormData({
       name: '',
       description: '',
+      tier: 'free',
+      trial_period_days: 0,
       price: 0,
       currency: 'KES',
       billing_cycle: 'monthly',
-      features: {},
       is_active: true,
+      limits: {
+        businesses: 1,
+        strategies: 1,
+        milestones: {
+          total: 20,
+          stages: ['concept', 'early_stage'],
+        },
+        financial_tracking: {
+          receipts_per_month: 0,
+          ocr_enabled: false,
+        },
+        ai_summary: {
+          type: 'none',
+          count: '0',
+        },
+        share_download: {
+          whatsapp: 'unlimited',
+          email: 'unlimited',
+          downloads_per_month: 0,
+          formats: [] as string[],
+        },
+      },
+      feature_descriptions: {
+        business_strategy: '',
+        milestones: '',
+        financial_tracking: '',
+        ai_summary: '',
+        share_download: '',
+      },
     });
     setPriceConfig({
       monthly: { price: 0, currency: 'KES' },
@@ -97,11 +159,16 @@ export function SubscriptionPlansManager() {
   const handleCreate = async () => {
     try {
       const available_cycles = Object.keys(priceConfig) as string[];
-      await apiClient.createPlan({
+      const payload = {
         ...formData,
+        features: {
+          limits: formData.limits,
+          features: formData.feature_descriptions,
+        },
         prices: priceConfig,
         available_cycles,
-      } as any);
+      };
+      await apiClient.createPlan(payload as any);
       toast({
         title: 'Success',
         description: 'Subscription plan created successfully',
@@ -123,11 +190,16 @@ export function SubscriptionPlansManager() {
     
     try {
       const available_cycles = Object.keys(priceConfig) as string[];
-      await apiClient.updatePlan(editingPlan.id, {
+      const payload = {
         ...formData,
+        features: {
+          limits: formData.limits,
+          features: formData.feature_descriptions,
+        },
         prices: priceConfig,
         available_cycles,
-      } as any);
+      };
+      await apiClient.updatePlan(editingPlan.id, payload as any);
       toast({
         title: 'Success',
         description: 'Subscription plan updated successfully',
@@ -164,15 +236,51 @@ export function SubscriptionPlansManager() {
 
   const openEditDialog = (plan: SubscriptionPlan) => {
     setEditingPlan(plan);
+    
+    const features = plan.features || {};
+    const limits = features.limits || {};
+    const descriptions = features.features || {};
+    
     setFormData({
       name: plan.name,
       description: plan.description || '',
+      tier: plan.tier || features.tier || 'free',
+      trial_period_days: plan.trial_period_days || 0,
       price: plan.price,
       currency: plan.currency,
       billing_cycle: plan.billing_cycle,
-      features: plan.features,
       is_active: plan.is_active,
+      limits: {
+        businesses: limits.businesses || 1,
+        strategies: limits.strategies || 1,
+        milestones: {
+          total: limits.milestones?.total || 20,
+          stages: limits.milestones?.stages || ['concept', 'early_stage'],
+        },
+        financial_tracking: {
+          receipts_per_month: limits.financial_tracking?.receipts_per_month || 0,
+          ocr_enabled: limits.financial_tracking?.ocr_enabled || false,
+        },
+        ai_summary: {
+          type: limits.ai_summary?.type || 'none',
+          count: limits.ai_summary?.count || '0',
+        },
+        share_download: {
+          whatsapp: limits.share_download?.whatsapp || 'unlimited',
+          email: limits.share_download?.email || 'unlimited',
+          downloads_per_month: limits.share_download?.downloads_per_month || 0,
+          formats: limits.share_download?.formats || [],
+        },
+      },
+      feature_descriptions: {
+        business_strategy: descriptions.business_strategy || '',
+        milestones: descriptions.milestones || '',
+        financial_tracking: descriptions.financial_tracking || '',
+        ai_summary: descriptions.ai_summary || '',
+        share_download: descriptions.share_download || '',
+      },
     });
+    
     // Load existing prices or fallback to single price
     if (plan.prices && Object.keys(plan.prices).length > 0) {
       setPriceConfig(plan.prices as PriceConfig);
@@ -237,89 +345,63 @@ export function SubscriptionPlansManager() {
               Create Plan
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-3xl max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>Create Subscription Plan</DialogTitle>
               <DialogDescription>
-                Create a new subscription plan for your users
+                Configure plan limits, features, and pricing
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Plan Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Pro, Premium"
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Plan description"
-                />
-              </div>
+            
+            <SubscriptionPlanForm formData={formData} setFormData={setFormData} />
+            
+            {/* Pricing Section */}
+            <div className="space-y-3 mt-4 border-t pt-4">
+              <Label>Billing Cycles & Pricing</Label>
               
-              {/* Multiple Billing Cycles */}
-              <div className="space-y-3">
-                <Label>Billing Cycles & Pricing</Label>
-                
-                {(['monthly', 'quarterly', 'yearly'] as const).map((cycle) => (
-                  <div key={cycle} className="border rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={!!priceConfig[cycle]}
-                          onCheckedChange={() => toggleBillingCycle(cycle)}
+              {(['monthly', 'quarterly', 'yearly'] as const).map((cycle) => (
+                <div key={cycle} className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={!!priceConfig[cycle]}
+                        onCheckedChange={() => toggleBillingCycle(cycle)}
+                      />
+                      <Label className="capitalize">{cycle}</Label>
+                    </div>
+                  </div>
+                  {priceConfig[cycle] && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Price"
+                          value={priceConfig[cycle]?.price || 0}
+                          onChange={(e) => updatePriceConfig(cycle, 'price', e.target.value)}
                         />
-                        <Label className="capitalize">{cycle}</Label>
+                      </div>
+                      <div>
+                        <Select 
+                          value={priceConfig[cycle]?.currency || 'KES'} 
+                          onValueChange={(value) => updatePriceConfig(cycle, 'currency', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="KES">KES</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                    {priceConfig[cycle] && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="Price"
-                            value={priceConfig[cycle]?.price || 0}
-                            onChange={(e) => updatePriceConfig(cycle, 'price', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Select 
-                            value={priceConfig[cycle]?.currency || 'KES'} 
-                            onValueChange={(value) => updatePriceConfig(cycle, 'currency', value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="KES">KES</SelectItem>
-                              <SelectItem value="USD">USD</SelectItem>
-                              <SelectItem value="EUR">EUR</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="is_active">Active</Label>
-              </div>
+                  )}
+                </div>
+              ))}
             </div>
+            
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                 Cancel
@@ -404,89 +486,63 @@ export function SubscriptionPlansManager() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Edit Subscription Plan</DialogTitle>
             <DialogDescription>
-              Update the subscription plan details
+              Update plan limits, features, and pricing
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">Plan Name</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Pro, Premium"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Plan description"
-              />
-            </div>
+          
+          <SubscriptionPlanForm formData={formData} setFormData={setFormData} />
+          
+          {/* Pricing Section */}
+          <div className="space-y-3 mt-4 border-t pt-4">
+            <Label>Billing Cycles & Pricing</Label>
             
-            {/* Multiple Billing Cycles */}
-            <div className="space-y-3">
-              <Label>Billing Cycles & Pricing</Label>
-              
-              {(['monthly', 'quarterly', 'yearly'] as const).map((cycle) => (
-                <div key={cycle} className="border rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={!!priceConfig[cycle]}
-                        onCheckedChange={() => toggleBillingCycle(cycle)}
+            {(['monthly', 'quarterly', 'yearly'] as const).map((cycle) => (
+              <div key={cycle} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={!!priceConfig[cycle]}
+                      onCheckedChange={() => toggleBillingCycle(cycle)}
+                    />
+                    <Label className="capitalize">{cycle}</Label>
+                  </div>
+                </div>
+                {priceConfig[cycle] && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Price"
+                        value={priceConfig[cycle]?.price || 0}
+                        onChange={(e) => updatePriceConfig(cycle, 'price', e.target.value)}
                       />
-                      <Label className="capitalize">{cycle}</Label>
+                    </div>
+                    <div>
+                      <Select 
+                        value={priceConfig[cycle]?.currency || 'KES'} 
+                        onValueChange={(value) => updatePriceConfig(cycle, 'currency', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="KES">KES</SelectItem>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  {priceConfig[cycle] && (
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Price"
-                          value={priceConfig[cycle]?.price || 0}
-                          onChange={(e) => updatePriceConfig(cycle, 'price', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Select 
-                          value={priceConfig[cycle]?.currency || 'KES'} 
-                          onValueChange={(value) => updatePriceConfig(cycle, 'currency', value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="KES">KES</SelectItem>
-                            <SelectItem value="USD">USD</SelectItem>
-                            <SelectItem value="EUR">EUR</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="edit-is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-              />
-              <Label htmlFor="edit-is_active">Active</Label>
-            </div>
+                )}
+              </div>
+            ))}
           </div>
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel

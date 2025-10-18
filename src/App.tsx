@@ -1,5 +1,6 @@
 
 import { Toaster } from "@/components/ui/toaster";
+import { SubscriptionExpiredBlocker } from "@/components/SubscriptionExpiredBlocker";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -47,8 +48,9 @@ const App = () => (
           <ServiceWorkerUpdater />
           <HubContextProvider>
             <ApprovalBlocker>
-              <ImpersonationBanner />
-              <Routes>
+              <SubscriptionExpiredBlocker>
+                <ImpersonationBanner />
+                <Routes>
                   <Route path="/" element={<Landing />} />
                   <Route path="/reset-password" element={<PasswordReset />} />
                   <Route path="/confirm-email" element={<EmailConfirmation />} />
@@ -68,7 +70,8 @@ const App = () => (
                 <Route path="/b2c" element={<Index />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
-            </Routes>
+                </Routes>
+              </SubscriptionExpiredBlocker>
             </ApprovalBlocker>
           </HubContextProvider>
         </BrowserRouter>

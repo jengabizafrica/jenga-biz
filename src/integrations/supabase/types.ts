@@ -1118,6 +1118,8 @@ export type Database = {
           name: string
           price: number
           prices: Json | null
+          tier: string | null
+          trial_period_days: number | null
           updated_at: string
         }
         Insert: {
@@ -1132,6 +1134,8 @@ export type Database = {
           name: string
           price: number
           prices?: Json | null
+          tier?: string | null
+          trial_period_days?: number | null
           updated_at?: string
         }
         Update: {
@@ -1146,6 +1150,8 @@ export type Database = {
           name?: string
           price?: number
           prices?: Json | null
+          tier?: string | null
+          trial_period_days?: number | null
           updated_at?: string
         }
         Relationships: []
