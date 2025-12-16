@@ -76,7 +76,7 @@ export type Database = {
           id: string
           performed_by: string | null
           reason: string | null
-          requester_ip: unknown | null
+          requester_ip: unknown
           requester_user_agent: string | null
         }
         Insert: {
@@ -86,7 +86,7 @@ export type Database = {
           id?: string
           performed_by?: string | null
           reason?: string | null
-          requester_ip?: unknown | null
+          requester_ip?: unknown
           requester_user_agent?: string | null
         }
         Update: {
@@ -96,7 +96,7 @@ export type Database = {
           id?: string
           performed_by?: string | null
           reason?: string | null
-          requester_ip?: unknown | null
+          requester_ip?: unknown
           requester_user_agent?: string | null
         }
         Relationships: [
@@ -961,7 +961,7 @@ export type Database = {
           action_type: string
           changed_by_user_id: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           new_role: Database["public"]["Enums"]["user_role"] | null
           old_role: Database["public"]["Enums"]["user_role"] | null
           target_user_id: string
@@ -972,7 +972,7 @@ export type Database = {
           action_type: string
           changed_by_user_id: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_role?: Database["public"]["Enums"]["user_role"] | null
           old_role?: Database["public"]["Enums"]["user_role"] | null
           target_user_id: string
@@ -983,7 +983,7 @@ export type Database = {
           action_type?: string
           changed_by_user_id?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           new_role?: Database["public"]["Enums"]["user_role"] | null
           old_role?: Database["public"]["Enums"]["user_role"] | null
           target_user_id?: string
@@ -999,7 +999,7 @@ export type Database = {
           id: string
           new_value: string | null
           old_value: string | null
-          requester_ip: unknown | null
+          requester_ip: unknown
           requester_user_agent: string | null
           setting_key: string
         }
@@ -1009,7 +1009,7 @@ export type Database = {
           id?: string
           new_value?: string | null
           old_value?: string | null
-          requester_ip?: unknown | null
+          requester_ip?: unknown
           requester_user_agent?: string | null
           setting_key: string
         }
@@ -1019,7 +1019,7 @@ export type Database = {
           id?: string
           new_value?: string | null
           old_value?: string | null
-          requester_ip?: unknown | null
+          requester_ip?: unknown
           requester_user_agent?: string | null
           setting_key?: string
         }
@@ -1244,7 +1244,7 @@ export type Database = {
           country_code: string | null
           created_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           region: string | null
           user_agent: string | null
           user_id: string
@@ -1256,7 +1256,7 @@ export type Database = {
           country_code?: string | null
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           region?: string | null
           user_agent?: string | null
           user_id: string
@@ -1268,7 +1268,7 @@ export type Database = {
           country_code?: string | null
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           region?: string | null
           user_agent?: string | null
           user_id?: string
@@ -1398,25 +1398,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_user_role_with_audit: {
-        Args:
-          | {
+      add_user_role_with_audit:
+        | {
+            Args: {
               hub_id?: string
               new_role: Database["public"]["Enums"]["user_role"]
               requester_ip?: unknown
               requester_user_agent?: string
               target_user_id: string
             }
-          | {
+            Returns: boolean
+          }
+        | {
+            Args: {
               new_role: Database["public"]["Enums"]["user_role"]
               requester_ip?: unknown
               requester_user_agent?: string
               target_user_id: string
             }
-        Returns: boolean
-      }
+            Returns: boolean
+          }
       analyze_drop_off_points: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avg_time_on_page: number
           drop_off_rate: number
@@ -1442,7 +1445,7 @@ export type Database = {
         }[]
       }
       calculate_stage_completion_rates: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avg_time_to_complete: number
           completion_rate: number
@@ -1467,14 +1470,8 @@ export type Database = {
         Args: { p_business_data: Json; p_strategy_data: Json }
         Returns: Json
       }
-      get_current_hub_context: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_hub_analytics: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      get_current_hub_context: { Args: never; Returns: string }
+      get_hub_analytics: { Args: never; Returns: Json }
       get_strategy_financials: {
         Args: { p_strategy_id: string }
         Returns: {
@@ -1502,18 +1499,9 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin_or_hub_manager: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
-      is_org_approved: {
-        Args: { p_user_id: string }
-        Returns: boolean
-      }
-      is_super_admin: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
+      is_admin_or_hub_manager: { Args: { _user_id: string }; Returns: boolean }
+      is_org_approved: { Args: { p_user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { user_id: string }; Returns: boolean }
       reject_pending_org: {
         Args: {
           approval_id: string
@@ -1523,23 +1511,26 @@ export type Database = {
         }
         Returns: boolean
       }
-      remove_user_role_with_audit: {
-        Args:
-          | {
+      remove_user_role_with_audit:
+        | {
+            Args: {
               hub_id?: string
               old_role: Database["public"]["Enums"]["user_role"]
               requester_ip?: unknown
               requester_user_agent?: string
               target_user_id: string
             }
-          | {
+            Returns: boolean
+          }
+        | {
+            Args: {
               old_role: Database["public"]["Enums"]["user_role"]
               requester_ip?: unknown
               requester_user_agent?: string
               target_user_id: string
             }
-        Returns: boolean
-      }
+            Returns: boolean
+          }
       service_add_user_role: {
         Args: {
           new_role: Database["public"]["Enums"]["user_role"]
@@ -1572,26 +1563,11 @@ export type Database = {
         }
         Returns: undefined
       }
-      setup_super_admin: {
-        Args: { admin_email: string }
-        Returns: string
-      }
-      start_impersonation: {
-        Args: { target_hub_id: string }
-        Returns: Json
-      }
-      stop_impersonation: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      update_geographic_analytics: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      user_can_interact: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      setup_super_admin: { Args: { admin_email: string }; Returns: string }
+      start_impersonation: { Args: { target_hub_id: string }; Returns: Json }
+      stop_impersonation: { Args: never; Returns: boolean }
+      update_geographic_analytics: { Args: never; Returns: undefined }
+      user_can_interact: { Args: never; Returns: boolean }
     }
     Enums: {
       approval_status:
